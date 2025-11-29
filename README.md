@@ -1,6 +1,10 @@
 # PX4 ROS 2 Interface Library
 ## TODOs
 1. 将px4_msgs的独立出来，作为该代码的submodules引用
+2. 研究官网提供的CI/CD的流程，规范化 lint/formatter的工具与规范
+3. 应当去除workflow/doxygen 的调用
+4. python的linter/formatter 要使用ruff的工具（as in drone_racer, 你可以不使用pyproject.toml)
+5. 标记好所索引的px4-gazebo中px4的版本/commit hash.
 
 
 
