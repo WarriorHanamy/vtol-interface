@@ -1,0 +1,10 @@
+# ros2 build artifacts
+build/
+log/
+install/
+
+# syncthing
+.syncthing*
+
+# VSCode
+.vscode/

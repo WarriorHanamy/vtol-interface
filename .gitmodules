@@ -1,0 +1,6 @@
+[submodule "src/px4_msgs/msg"]
+	path = src/px4_msgs/msg
+	url = git@github.com:Arclunar/px4_msgs-msg.git
+[submodule "src/px4-ros2-interface-lib"]
+	path = src/px4-ros2-interface-lib
+	url = git@github.com:Arclunar/px4-ros2-interface.git
