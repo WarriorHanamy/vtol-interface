@@ -15,7 +15,7 @@
 ### 📥 克隆仓库
 
 ```bash
-git clone --recursive https://github.com/Arclunar/PX4-ROS2-Bridge.git --depth 1 .
+git clone --recursive https://github.com/Arclunar/PX4-ROS2-Bridge.git --depth 1
 ```
 ### 配置px4_msgs
 ```bash
@@ -52,6 +52,11 @@ just build-ros2
 
 ```bash
 just run-ros2
+```
+
+#### 3. 编译ros2工作空间
+```bash
+just build
 ```
 
 
