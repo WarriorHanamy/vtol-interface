@@ -1,23 +1,27 @@
 set shell := ["bash", "-c"]
 
 example:
-    source ./install/setup.sh && \
+    source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    source {{justfile_directory()}}/install/setup.sh && \
     ros2 run example_mode_manual_cpp example_mode_manual
 
 neural-mode:
-    source ./install/setup.sh && \
+    source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    source {{justfile_directory()}}/install/setup.sh && \
     ros2 launch neural_demo neural_demo.launch.py
 
 neural-inference:
-    source ./install/setup.sh && \
+    source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    source {{justfile_directory()}}/install/setup.sh && \
     ros2 launch isaac_pos_ctrl_neural isaac_pos_ctrl_launch.py
 
 fake-network:
-    source ./install/setup.sh && \
+    source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    source {{justfile_directory()}}/install/setup.sh && \
     ros2 launch neural_demo fake_network_node.launch.py
 
 config-px4msg:
-    bash ./scripts/config_px4msg.sh
+    bash {{justfile_directory()}}/scripts/config_px4msg.sh
 
 build:
     source /opt/ros/${ROS_DISTRO}/setup.bash && \
@@ -31,7 +35,7 @@ full-build:
 
 alias c := clean
 clean:
-    [ -d build ] && rm -rf build; [ -d log ] && rm -rf log; [ -d install ] && rm -rf install
+    [ -d {{justfile_directory()}}/build ] && rm -rf {{justfile_directory()}}/build; [ -d {{justfile_directory()}}/log ] && rm -rf {{justfile_directory()}}/log; [ -d {{justfile_directory()}}/install ] && rm -rf {{justfile_directory()}}/install
 
 build-qgc:
     docker build -f docker/qgc5.dockerfile \
