@@ -28,7 +28,7 @@ import rclpy.qos
 from px4_msgs.msg import VehicleRatesSetpoint, VehicleOdometry
 from std_msgs.msg import Bool
 
-from isaac_pos_ctrl_neural.math_utils import (
+from neural_pos_ctrl.math_utils import (
     quaternion_to_euler,
     rotation_matrix_ned_to_body,
     rotation_matrix_body_to_ned,
@@ -91,7 +91,7 @@ class IsaacPositionControlNode(rclpy.node.Node):
         """设置ROS2参数"""
         # 模型参数
         self.declare_parameter(
-            "model_path", "share/isaac_pos_ctrl_neural/models/isaac_pos_ctrl.onnx"
+            "model_path", "share/neural_pos_ctrl/models/isaac_pos_ctrl.onnx"
         )
 
         self.declare_parameter("control_rate", 50.0)
@@ -157,7 +157,7 @@ class IsaacPositionControlNode(rclpy.node.Node):
             if not self._model_path.exists():
                 # 尝试在包共享目录中查找
                 package_share = (
-                    Path(__file__).parent.parent / "share" / "isaac_pos_ctrl_neural"
+                    Path(__file__).parent.parent / "share" / "neural_pos_ctrl"
                 )
                 model_path = package_share / "models" / self._model_path.name
                 if model_path.exists():

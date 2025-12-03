@@ -8,17 +8,17 @@ example:
 neural-mode:
     source /opt/ros/${ROS_DISTRO}/setup.bash && \
     source {{justfile_directory()}}/install/setup.sh && \
-    ros2 launch neural_demo neural_demo.launch.py
+    ros2 launch neural_executor neural_demo.launch.py
 
 neural-inference:
     source /opt/ros/${ROS_DISTRO}/setup.bash && \
     source {{justfile_directory()}}/install/setup.sh && \
-    ros2 launch isaac_pos_ctrl_neural isaac_pos_ctrl_launch.py
+    ros2 launch neural_pos_ctrl pos_ctrl_launch.py
 
 fake-network:
     source /opt/ros/${ROS_DISTRO}/setup.bash && \
     source {{justfile_directory()}}/install/setup.sh && \
-    ros2 launch neural_demo fake_network_node.launch.py
+    ros2 launch fake_network fake_network_node.launch.py
 
 config-px4msg:
     bash {{justfile_directory()}}/scripts/config_px4msg.sh
@@ -48,6 +48,7 @@ build-ros2:
     -t ros2:latest .
 
 run-qgc:
+    echo " " | sudo -S chmod 777 /dev/input/event* && \
     docker run --rm \
         --privileged --net=host \
         -it \
@@ -75,7 +76,6 @@ run-ros2:
 alias a := enter-ros2
 enter-ros2:
     docker exec -it ros2 bash
-
 
 # Docker Compose commands
 up:
