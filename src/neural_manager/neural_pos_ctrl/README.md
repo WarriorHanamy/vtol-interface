@@ -42,13 +42,13 @@
 ## 文件结构
 
 ```
-isaac_pos_ctrl_neural/
+neural_pos_ctrl/
 ├── package.xml              # ROS2功能包配置
 ├── CMakeLists.txt           # 构建配置
 ├── setup.py                # Python包设置
-├── isaac_pos_ctrl_neural/      # Python模块
+├── neural_pos_ctrl/      # Python模块
 │   ├── __init__.py
-│   ├── isaac_pos_ctrl_node.py   # 主推理节点
+│   ├── pos_ctrl_node.py   # 主推理节点
 │   └── set_target_pos.py       # 目标位置设置工具
 ├── launch/
 │   └── isaac_pos_ctrl_launch.py # 启动文件
@@ -69,7 +69,7 @@ cd /home/arc/framework/isaac/isaac_drone_ctrl
 # 导出训练好的模型为ONNX格式
 python3 scripts/export_pos_ctrl_onnx.py \
     --model logs/skrl/drone_racer/2025-11-27_04-11-11_ppo_torch/best_agent.pt \
-    --output /home/arc/framework/isaac/ros2_ws/src/isaac_pos_ctrl_neural/models
+    --output /home/arc/framework/isaac/ros2_ws/src/neural_pos_ctrl/models
     --name isaac_pos_ctrl
 ```
 
@@ -80,7 +80,7 @@ python3 scripts/export_pos_ctrl_onnx.py \
 cd /home/arc/framework/isaac/ros2_ws
 
 # 构建功能包
-colcon build --packages-select isaac_pos_ctrl_neural
+colcon build --packages-select neural_pos_ctrl
 
 # 源工作空间
 source install/setup.bash
@@ -90,16 +90,16 @@ source install/setup.bash
 
 ```bash
 # 使用默认参数启动
-ros2 launch isaac_pos_ctrl_neural isaac_pos_ctrl_launch.py
+ros2 launch neural_pos_ctrl isaac_pos_ctrl_launch.py
 
 # 启用调试模式
-ros2 launch isaac_pos_ctrl_neural isaac_pos_ctrl_launch.py debug_mode:=true
+ros2 launch neural_pos_ctrl isaac_pos_ctrl_launch.py debug_mode:=true
 
 # 设置自定义目标位置
-ros2 launch isaac_pos_ctrl_neural isaac_pos_ctrl_launch.py target_position:="[2.0, 1.0, 2.5]" target_yaw:=1.57
+ros2 launch neural_pos_ctrl isaac_pos_ctrl_launch.py target_position:="[2.0, 1.0, 2.5]" target_yaw:=1.57
 
 # 使用命令行工具设置目标
-python3 isaac_pos_ctrl_neural/set_target_pos.py --position "2.0, 1.0, 2.5" --yaw 1.57 --verbose
+python3 neural_pos_ctrl/set_target_pos.py --position "2.0, 1.0, 2.5" --yaw 1.57 --verbose
 ```
 
 ## 话题接口
@@ -156,17 +156,17 @@ python3 isaac_pos_ctrl_neural/set_target_pos.py --position "2.0, 1.0, 2.5" --yaw
 ### 单元测试
 ```bash
 # 测试导入
-python3 -c "import isaac_pos_ctrl_neural; print('导入成功')"
+python3 -c "import neural_pos_ctrl; print('导入成功')"
 
 # 测试模型加载
-python3 -c "from isaac_pos_ctrl_neural.isaac_pos_ctrl_node import IsaacPositionControlNode; print('节点类加载成功')"
+python3 -c "from neural_pos_ctrl.pos_ctrl_node import IsaacPositionControlNode; print('节点类加载成功')"
 ```
 
 ### 集成测试
 ```bash
 # 启动PX4 Gazebo仿真
 # 在另一个终端启动控制节点
-ros2 launch isaac_pos_ctrl_neural isaac_pos_ctrl_launch.py
+ros2 launch neural_pos_ctrl isaac_pos_ctrl_launch.py
 
 # 测试目标位置设置
 ros2 topic pub /neural/target_pose geometry_msgs/PoseStamped '{header: {frame_id: "world"}, pose: {position: {x: 2.0, y: 1.0, z: 2.0}, orientation: {w: 1.0, x: 0.0, y: 0.0, z: 0.0}}}'
@@ -207,7 +207,7 @@ ros2 topic pub /neural/mode_neural_ctrl std_msgs/Bool "data: true"
 
 启用调试模式获得详细的状态信息：
 ```bash
-ros2 launch isaac_pos_ctrl_neural isaac_pos_ctrl_launch.py debug_mode:=true
+ros2 launch neural_pos_ctrl isaac_pos_ctrl_launch.py debug_mode:=true
 ```
 
 输出示例：

@@ -70,14 +70,14 @@ just build
 
 将训练好的 ONNX 模型文件放置在以下目录：
 ```
-src/isaac_pos_ctrl_neural/models/
+src/neural_manager/neural_pos_ctrl/models/
 ```
 
 #### ⚙️ 参数配置
 
 修改启动文件中的模型路径：
 ```bash
-src/isaac_pos_ctrl_neural/launch/isaac_pos_ctrl_launch.py
+src/neural_manager/neural_pos_ctrl/launch/isaac_pos_ctrl_launch.py
 ```
 更新 `model_path` 参数指向你的模型文件。
 
@@ -85,7 +85,7 @@ src/isaac_pos_ctrl_neural/launch/isaac_pos_ctrl_launch.py
 
 如果观测量设置不同，需要修改观测量对齐函数：
 ```bash
-src/isaac_pos_ctrl_neural/isaac_pos_ctrl_neural/isaac_pos_ctrl_node.py
+src/neural_manager/neural_pos_ctrl/isaac_pos_ctrl_neural/pos_ctrl_node.py
 ```
 
 #### 📊 当前观测量配置
@@ -277,7 +277,10 @@ ros2_ws/
 │   │   ├── neural_demo/             # 神经网络控制演示
 │   │   ├── example_mode_*/          # 各种飞行模式示例
 │   │   └── px4_ros2_cpp/            # 核心 C++ 库
-│   ├── isaac_pos_ctrl_neural/       # Isaac 位置控制（神经网络）
+│   ├── neural_manager/             # 神经控制管理器
+│   │   └── neural_pos_ctrl/         # 神经位置控制
+│   ├── neural_utils/               # 神经控制工具包
+│   │   └── fake_network/           # 仿真网络节点
 │   ├── translation_node/            # 数据转换节点
 │   ├── super_interface/             # 超级接口
 │   └── time_test_example/           # 时间测试示例

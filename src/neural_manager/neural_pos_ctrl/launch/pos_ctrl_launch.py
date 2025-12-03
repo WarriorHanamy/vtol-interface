@@ -10,13 +10,13 @@ Isaac Position Control Neural Network Launch File
 
 使用方法:
   # 使用默认参数启动
-  ros2 launch isaac_pos_ctrl_neural isaac_pos_ctrl_launch.py
+  ros2 launch neural_pos_ctrl isaac_pos_ctrl_launch.py
 
   # 启用调试模式
-  ros2 launch isaac_pos_ctrl_neural isaac_pos_ctrl_launch.py debug_mode:=true
+  ros2 launch neural_pos_ctrl isaac_pos_ctrl_launch.py debug_mode:=true
 
   # 设置自定义目标位置
-  ros2 launch isaac_pos_ctrl_neural isaac_pos_ctrl_launch.py target_position:="[2.0, -1.0, 2.0]"
+  ros2 launch neural_pos_ctrl isaac_pos_ctrl_launch.py target_position:="[2.0, -1.0, 2.0]"
 """
 
 from launch import LaunchDescription
@@ -28,7 +28,7 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     """生成launch描述"""
-    package_name = "isaac_pos_ctrl_neural"
+    package_name = "neural_pos_ctrl"
 
     # 获取包共享目录
     package_share_dir = get_package_share_directory(package_name)
@@ -78,8 +78,8 @@ def generate_launch_description():
             # 主推理节点
             Node(
                 package=package_name,
-                executable="isaac_pos_ctrl_node.py",
-                name="isaac_pos_ctrl_node",
+                executable="pos_ctrl_node.py",
+                name="pos_ctrl_node",
                 namespace=LaunchConfiguration("namespace"),
                 output="screen",
                 emulate_tty=True,

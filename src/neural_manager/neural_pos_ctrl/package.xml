@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>isaac_pos_ctrl_neural</name>
+  <name>neural_pos_ctrl</name>
   <version>1.0.0</version>
   <description>Isaac Position Control Neural Network Inference for PX4</description>
   <maintainer email="isaac.developer@example.com">Isaac Developer</maintainer>

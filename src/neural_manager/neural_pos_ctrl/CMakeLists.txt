@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(isaac_pos_ctrl_neural)
+project(neural_pos_ctrl)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -17,7 +17,7 @@ ament_python_install_package(${PROJECT_NAME})
 
 # Install Python executables
 install(PROGRAMS
-  ${PROJECT_NAME}/isaac_pos_ctrl_node.py
+  ${PROJECT_NAME}/pos_ctrl_node.py
   ${PROJECT_NAME}/set_target_pos.py
   DESTINATION lib/${PROJECT_NAME}
 )
