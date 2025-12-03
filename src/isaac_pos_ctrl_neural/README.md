@@ -243,12 +243,12 @@ ros2 launch isaac_pos_ctrl_neural isaac_pos_ctrl_launch.py debug_mode:=true
 
 ## 许可证
 
-Copyright (c) 2025, Kousheek Chakraborty
+Copyright (c) 2025, Differential Robotics
 SPDX-License-Identifier: BSD-3-Clause
 
 ## 贡献者
 
-- Kousheek Chakraborty (原始Isaac模型和训练)
+- Differential Robotics (原始Isaac模型和训练)
 - Isaac Neural Control Implementation (ROS2集成和部署)
 
 ## 引用
