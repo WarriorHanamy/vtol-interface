@@ -1,7 +1,7 @@
 # ros2 build artifacts
-build/
-log/
-install/
+build/*
+log/*
+install/*
 
 # syncthing
 .syncthing*

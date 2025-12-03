@@ -20,8 +20,8 @@ RUN wget -qO - 'https://proget.makedeb.org/debian-feeds/prebuilt-mpr.pub' | gpg 
 RUN pip3 install --no-cache-dir onnxruntime numpy
 
 RUN useradd -m -u 1000 ros && \
-    echo "ros ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
-    echo "source /opt/ros/humble/setup.bash" >> ${HOME}/.bashrc
+    echo "ros ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
+    echo "source /opt/ros/humble/setup.bash" >> /home/ros/.bashrc
 
 
 USER ros
