@@ -22,6 +22,20 @@ git clone --recursive https://github.com/Arclunar/PX4-ROS2-Bridge.git --depth 1
 just config-px4msg
 ```
 
+### Docker 部署 PX4-Gazebo-harmonic
+
+#### 1. 构建 Docker 镜像
+
+```bash
+just build-px4
+```
+
+#### 2. 测试运行容器启动 PX4-Gazebo-harmonic
+
+```bash
+just run-px4
+```
+
 
 ### Docker 部署 QGroundControl
 
@@ -271,23 +285,54 @@ just neural-inference
 ## 📦 包结构
 
 ```
-ros2_ws/
-├── src/
-│   ├── px4-ros2-interface-lib/      # PX4-ROS2 接口库
-│   │   ├── neural_demo/             # 神经网络控制演示
-│   │   ├── example_mode_*/          # 各种飞行模式示例
-│   │   └── px4_ros2_cpp/            # 核心 C++ 库
-│   ├── neural_manager/             # 神经控制管理器
-│   │   └── neural_pos_ctrl/         # 神经位置控制
-│   ├── neural_utils/               # 神经控制工具包
-│   │   └── fake_network/           # 仿真网络节点
-│   ├── translation_node/            # 数据转换节点
-│   ├── super_interface/             # 超级接口
-│   └── time_test_example/           # 时间测试示例
-├── build/                           # 构建输出
-├── install/                         # 安装文件
-└── log/                             # 日志文件
+📁 ros2_ws/
+├── 📂 src/
+│   ├── 🧠 neural_manager/             # 神经网络控制核心
+│   │   ├── neural_executor/          # 执行器（模式管理与切换）
+│   │   ├── neural_pos_ctrl/          # 位置控制（ONNX 推理）
+│   │   └── neural_utils/             # 工具包（测试节点）
+│   │
+│   ├── 🔧 px4-ros2-interface-lib/     # PX4-ROS2 官方接口库
+│   │   ├── px4_ros2_cpp/             # 核心 C++ 库
+│   │   └── example_mode_*/           # 飞行模式示例
+│   │
+│   └── 📡 px4_msgs/                   # PX4 消息定义
+│
+├── 🐳 docker/                         # Docker 配置
+├── 🔧 scripts/                        # 实用脚本
+└── 📋 justfile                        # 任务运行器
 ```
+
+### 🎯 核心功能模块
+
+<table>
+<tr>
+<td align="center" width="33%">
+
+### 🧠
+**Neural Executor**
+<br>
+模式管理与切换
+
+</td>
+<td align="center" width="33%">
+
+### 🤖
+**Neural Pos Ctrl**
+<br>
+ONNX 模型推理
+
+</td>
+<td align="center" width="33%">
+
+### 🔧
+**PX4-ROS2 Lib**
+<br>
+官方接口库
+
+</td>
+</tr>
+</table>
 
 
 
