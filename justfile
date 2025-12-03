@@ -25,7 +25,7 @@ build:
     --cmake-args -DPython3_EXECUTABLE=/usr/bin/python3
 
 clean:
-    rm build/ log/ install/ -fr
+    [ -d build ] && rm -rf build; [ -d log ] && rm -rf log; [ -d install ] && rm -rf install
 
 build-qgc:
     docker build -f docker/qgc5.dockerfile \
