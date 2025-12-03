@@ -193,7 +193,7 @@ just run-ros2
 <td>
 
 ```bash
-just neural_mode
+just neural-mode
 ```
 
 </td>
@@ -217,7 +217,7 @@ just enter-ros2
 <td>
 
 ```bash
-just neural_inference
+just neural-inference
 ```
 
 </td>

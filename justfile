@@ -26,8 +26,7 @@ config-px4msg:
 build:
     source /opt/ros/${ROS_DISTRO}/setup.bash && \
     colcon build --symlink-install \
-    --cmake-args -DPython3_EXECUTABLE=/usr/bin/python3 \
-    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
 alias b := full-build
 full-build:
@@ -80,7 +79,7 @@ enter-ros2:
 
 # Docker Compose commands
 up:
-    docker compose up
+    docker compose up -d
 
 down:
     docker compose down
