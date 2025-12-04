@@ -20,8 +20,8 @@ fake-network:
     source {{justfile_directory()}}/install/setup.sh && \
     ros2 launch fake_network fake_network_node.launch.py
 
-config-px4msg:
-    bash {{justfile_directory()}}/scripts/config_px4msg.sh
+config-px4msgs:
+    bash {{justfile_directory()}}/scripts/config_px4msgs.sh
 
 build:
     source /opt/ros/${ROS_DISTRO}/setup.bash && \
@@ -30,7 +30,7 @@ build:
 
 alias b := full-build
 full-build:
-    just config-px4msg && \
+    just config-px4msgs && \
     just build
 
 alias c := clean

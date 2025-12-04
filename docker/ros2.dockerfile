@@ -23,6 +23,8 @@ RUN useradd -m -u 1000 ros && \
     echo "ros ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
     echo "source /opt/ros/humble/setup.bash" >> /home/ros/.bashrc
 
+RUN mkdir -p /home/ros/ros2_ws
+RUN chown -R ros:ros /home/ros/ros2_ws
 
 USER ros
 WORKDIR /home/ros

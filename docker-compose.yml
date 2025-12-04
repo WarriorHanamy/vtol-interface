@@ -46,7 +46,9 @@ services:
     volumes:
       - ${HOME}/.Xauthority:/home/ros/.Xauthority
       - /tmp/.X11-unix:/tmp/.X11-unix
-      - .:/home/ros/ros2_ws
+      - ./src:/home/ros/ros2_ws/src
+      - ./scripts:/home/ros/ros2_ws/scripts
+      - ./justfile:/home/ros/ros2_ws/justfile
     command: tail -f /dev/null
     deploy:
       resources:
