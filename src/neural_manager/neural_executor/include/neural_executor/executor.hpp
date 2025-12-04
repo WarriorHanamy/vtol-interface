@@ -10,10 +10,12 @@
 #include <Eigen/Dense>
 
 using namespace std::chrono_literals; // NOLINT
-// static constexpr uint16_t RC_Neural_Waypoints_Cmds_MASK = 1024;
 
 class NeuralExecutor : public px4_ros2::ModeExecutorBase
 {
+static constexpr uint16_t RC_NN_CMD_MASK = 1024;
+static constexpr uint8_t POSCTL_NAV_STATE = px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_POSCTL;
+
 public:
   enum class State
   {
@@ -25,6 +27,7 @@ public:
     WaitUntilDisarmed,
   };
 
+
   struct Config
   {
     float position_timeout = 1.0f;
@@ -35,7 +38,6 @@ public:
     std::vector<Eigen::Vector3f> waypoints;
   };
 
-  // Constructor: owned_mode is ModeDemoEntry, neural_mode is ModeNeuralCtrl
   NeuralExecutor(
     px4_ros2::ModeBase & owned_mode,
     px4_ros2::ModeBase & neural_mode)
@@ -53,7 +55,6 @@ public:
   void onActivate() override
   {
     RCLCPP_INFO(node().get_logger(), "NeuralExecutor: Starting mission");
-    _button_pressed = false;
     _current_nav_state = 0;
     runState(State::TakingOff, px4_ros2::Result::Success);
   }
@@ -79,14 +80,13 @@ public:
         break;
 
       case State::Position:
-        if(_current_nav_state != px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_POSCTL) {
+        if(_current_nav_state != POSCTL_NAV_STATE) {
           RCLCPP_INFO(node().get_logger(), "State: Position - switching to Position mode");
           scheduleMode(px4_ros2::ModeBase::kModeIDPosctl, [this](px4_ros2::Result pos_result) {
             handlePositionSwitchResult(pos_result);
           });
         }
-        RCLCPP_INFO(node().get_logger(), "State: Position - waiting for RC trigger (Button=1024)");
-        startRCMonitoring();
+        RCLCPP_INFO(node().get_logger(), "State: Position - waiting for RC trigger");
         break;
 
       case State::NeuralCtrl:
@@ -111,20 +111,20 @@ public:
         // Initialize the start time for waiting
         _still_wait_start_time = node().get_clock()->now();
         // Check if vehicle has been still for the minimum wait time
-          _still_check_timer = node().create_wall_timer(
-            std::chrono::milliseconds(500),
-            [this]() {
-              const auto current_time = node().get_clock()->now();
-              const auto elapsed_seconds = (current_time - _still_wait_start_time).seconds();
+        _still_check_timer = node().create_wall_timer(
+          std::chrono::milliseconds(500),
+          [this]() {
+            const auto current_time = node().get_clock()->now();
+            const auto elapsed_seconds = (current_time - _still_wait_start_time).seconds();
 
-              // Check if vehicle is still and target time has been reached
-              if ( isVehicleStill() && (elapsed_seconds >= _config.still_wait_time) ) {
-                _still_check_timer->cancel();
-                land([this](px4_ros2::Result result) {
-                  runState(State::WaitUntilDisarmed, result);
-                });
-              }
-          });
+            // Check if vehicle is still and target time has been reached
+            if ( isVehicleStill() && (elapsed_seconds >= _config.still_wait_time) ) {
+              _still_check_timer->cancel();
+              land([this](px4_ros2::Result result) {
+                runState(State::WaitUntilDisarmed, result);
+              });
+            }
+        });
         break;
 
       case State::Land:
@@ -152,10 +152,7 @@ private:
   rclcpp::Subscription<px4_msgs::msg::ManualControlSetpoint>::SharedPtr _rc_sub;
   rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr _vehicle_status_sub;
   rclcpp::Subscription<px4_msgs::msg::VehicleLocalPosition>::SharedPtr _vehicle_position_sub;
-  rclcpp::TimerBase::SharedPtr _rc_monitor_timer;
   uint8_t _current_nav_state;
-  bool _button_pressed;
-  rclcpp::Time _last_rc_update;
 
   Eigen::Vector3f _current_velocity;
 
@@ -164,28 +161,6 @@ private:
   rclcpp::TimerBase::SharedPtr _still_check_timer;
   rclcpp::Time _still_wait_start_time;
 
-  void handlePositionSwitchResult(px4_ros2::Result result)
-  {
-    if (result != px4_ros2::Result::Success) {
-        switch (result) {
-          case px4_ros2::Result::Rejected:
-            RCLCPP_ERROR(node().get_logger(), "Failed to switch to Position mode: Rejected");
-            break;
-          case px4_ros2::Result::Timeout:
-            RCLCPP_ERROR(node().get_logger(), "Failed to switch to Position mode: Timeout");
-            break;
-          case px4_ros2::Result::Interrupted:
-            RCLCPP_ERROR(node().get_logger(), "Position mode switch interrupted");
-            break;
-          case px4_ros2::Result::Deactivated:
-            RCLCPP_WARN(node().get_logger(), "Position mode is deactivated");
-            break;
-          default:
-            RCLCPP_ERROR(node().get_logger(), "Schedule position mode failed: %s", resultToString(result));
-            break;
-        }
-      }
-  }
 
   // Setup functions
   void setupRCInput()
@@ -208,65 +183,51 @@ private:
       "/fmu/out/manual_control_setpoint" + px4_ros2::getMessageNameVersion<px4_msgs::msg::ManualControlSetpoint>(),
       rclcpp::SensorDataQoS(),
       [this](const px4_msgs::msg::ManualControlSetpoint::SharedPtr msg) {
-        _last_rc_update = node().get_clock()->now();
-        
         handleRCInput(msg);
       });
   }
 
 
-  // RC monitoring functions
-  void startRCMonitoring()
-  {
-    _rc_monitor_timer = node().create_wall_timer(
-      std::chrono::milliseconds(50),
-      [this]() { checkRCInput(); });
-  }
-
-  void stopRCMonitoring()
-  {
-    if (_rc_monitor_timer) {
-      _rc_monitor_timer->cancel();
-      _rc_monitor_timer.reset();
-    }
-  }
-
-  void checkRCInput()
-  {
-    // Check RC connection timeout
-    const auto now = node().get_clock()->now();
-    if ((now - _last_rc_update).seconds() > _config.rc_timeout) {
-      return;
-    }
-
-    // Check if we're in Position mode
-    const uint8_t POSCTL_NAV_STATE = px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_POSCTL;
-    if (_current_nav_state != POSCTL_NAV_STATE) {
-      return;
-    }
-  }
-
   void handleRCInput(const px4_msgs::msg::ManualControlSetpoint::SharedPtr msg)
   {
     // Only process if in Position mode
-    const uint8_t POSCTL_NAV_STATE = px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_POSCTL;
-
     static bool button_pressed_last = false;
 
     if (_current_nav_state != POSCTL_NAV_STATE) {
       return;
     }
 
-    // Check button press (Button=1024 -> aux1 > 0.8)
-    bool button_pressed_now = (msg->buttons == 1024);
+    bool button_pressed_now = (msg->buttons == RC_NN_CMD_MASK);
 
     if (button_pressed_now && !button_pressed_last) {
       // Rising edge detected - trigger Neural!
-      stopRCMonitoring();
       runState(State::NeuralCtrl, px4_ros2::Result::Success);
     }
 
     button_pressed_last = button_pressed_now;  
+  }
+
+  void handlePositionSwitchResult(px4_ros2::Result result)
+  {
+    if (result != px4_ros2::Result::Success) {
+        switch (result) {
+          case px4_ros2::Result::Rejected:
+            RCLCPP_ERROR(node().get_logger(), "Failed to switch to Position mode: Rejected");
+            break;
+          case px4_ros2::Result::Timeout:
+            RCLCPP_ERROR(node().get_logger(), "Failed to switch to Position mode: Timeout");
+            break;
+          case px4_ros2::Result::Interrupted:
+            RCLCPP_ERROR(node().get_logger(), "Position mode switch interrupted");
+            break;
+          case px4_ros2::Result::Deactivated:
+            RCLCPP_WARN(node().get_logger(), "Position mode is deactivated");
+            break;
+          default:
+            RCLCPP_ERROR(node().get_logger(), "Schedule position mode failed: %s", resultToString(result));
+            break;
+        }
+      }
   }
 
   // Utility functions
