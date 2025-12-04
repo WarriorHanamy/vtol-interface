@@ -7,65 +7,76 @@
 #include <px4_ros2/components/mode.hpp>
 #include <px4_ros2/control/setpoint_types/multicopter/goto.hpp>
 #include <px4_ros2/control/setpoint_types/experimental/rates.hpp>
+#include <px4_ros2/control/setpoint_types/experimental/acc_rates.hpp>
 #include <px4_ros2/odometry/local_position.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <Eigen/Core>
+#include <variant>
 
-#define USE_GOTO_CTRL
-#define USE_RATES_CTRL
+// Compile-time control mode selection
+// #define USE_GOTO_CTRL
+// #define USE_RATES_CTRL
+#define USE_ACC_RATES_CTRL
 
+// Compile-time check: Ensure exactly one control mode is defined
+#if defined(USE_GOTO_CTRL) + defined(USE_RATES_CTRL) + defined(USE_ACC_RATES_CTRL) != 1
+#error "Exactly one control mode must be defined: USE_GOTO_CTRL, USE_RATES_CTRL, or USE_ACC_RATES_CTRL"
+#endif
+
+// Neural control setpoint types - Type as Documentation
+using NeuralGotoSetpoint = geometry_msgs::msg::PoseStamped;
+using NeuralRatesSetpoint = px4_msgs::msg::VehicleRatesSetpoint;
+using NeuralAccRatesSetpoint = px4_msgs::msg::VehicleAccRatesSetpoint;
+
+// Unified setpoint type using std::variant for type-safe dispatching
+using NeuralControlSetpoint = std::variant<
+    NeuralGotoSetpoint,
+    NeuralRatesSetpoint,
+    NeuralAccRatesSetpoint>;
+
+// Neural setpoint type enumeration
+enum class NeuralSetpointType : uint8_t {
+    Goto,
+    Rates,
+    AccRates
+};
+
+/**
+ * @class NeuralCtrlMode
+ * @brief High-performance neural network controlled flight mode with type-safe setpoint handling
+ * 
+ * Supported control modes: Goto | Rates | AccRates (compile-time selected)
+ */
 class NeuralCtrlMode : public px4_ros2::ModeBase
 {
 public:
   explicit NeuralCtrlMode(rclcpp::Node &arg_node)
       : ModeBase(arg_node, Settings{"NeuralControl"})
   {
-    // Initialize state
     _activation_time = {0};
-    _has_goto_cmd = false;
-    _has_rates_sp = false;
+    _has_neural_setpoint = false;
+    
+#ifdef USE_GOTO_CTRL
+    _setpoint_type = NeuralSetpointType::Goto;
+#elif defined(USE_RATES_CTRL)
+    _setpoint_type = NeuralSetpointType::Rates;
+#elif defined(USE_ACC_RATES_CTRL)
+    _setpoint_type = NeuralSetpointType::AccRates;
+#endif
 
-    // Load configuration
-    _node.declare_parameter("goto_cmd_timeout", 2.0f);
-    _node.declare_parameter("goto_cmd_max_velocity", 2.0f);
+    _node.declare_parameter("neural_setpoint_timeout", 0.05);
+    _neural_setpoint_timeout = _node.get_parameter("neural_setpoint_timeout").as_double();
 
-    _goto_cmd_timeout = _node.get_parameter("goto_cmd_timeout").as_double();
-    _goto_cmd_max_velocity = _node.get_parameter("goto_cmd_max_velocity").as_double();
-
-    // Subscriber and publishers
     _goto_setpoint = std::make_shared<px4_ros2::MulticopterGotoSetpointType>(*this);
     _rates_setpoint = std::make_shared<px4_ros2::RatesSetpointType>(*this);
+    _acc_rates_setpoint = std::make_shared<px4_ros2::AccRatesSetpointType>(*this);
     _odometry_local_position = std::make_shared<px4_ros2::OdometryLocalPosition>(*this);
     _manual_control_input = std::make_shared<px4_ros2::ManualControlInput>(*this);
 
-    // Subscribe to target position from fake network node
-    _goto_cmd_sub = _node.create_subscription<geometry_msgs::msg::PoseStamped>(
-        "/neural/target_pose", 10,
-        [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg)
-        {
-          _goto_cmd_target = Eigen::Vector3f(
-              msg->pose.position.x,
-              msg->pose.position.y,
-              msg->pose.position.z);
-          _goto_cmd_timestamp = _node.get_clock()->now();
-          _has_goto_cmd = true;
-          RCLCPP_DEBUG_ONCE(_node.get_logger(), "Received goto cmd target: [%.2f, %.2f, %.2f]",
-                            _goto_cmd_target.x(), _goto_cmd_target.y(), _goto_cmd_target.z());
-        });
+    subscribeToNeuralSetpoint();
 
-    // subscribe to rate setpoint from neural network node
-    _neural_rates_sub = _node.create_subscription<px4_msgs::msg::VehicleRatesSetpoint>(
-        "/neural/rates_sp", 10,
-        [this](const px4_msgs::msg::VehicleRatesSetpoint::SharedPtr msg)
-        {
-          _rates_sp_msg = *msg;
-          _rates_sp_msg_timestamp = _node.get_clock()->now();
-          _has_rates_sp = true;
-        });
-
-    // Subscribe to stop neural control command from any node
     _stop_neural_ctrl_sub = _node.create_subscription<std_msgs::msg::Bool>(
         "/neural/stop_control", 10,
         [this](const std_msgs::msg::Bool::SharedPtr msg)
@@ -77,22 +88,24 @@ public:
           }
         });
 
-      _start_neural_ctrl_pub = _node.create_publisher<std_msgs::msg::Bool>(
-            "/neural/mode_neural_ctrl", 10);
-    
+    _start_neural_ctrl_pub = _node.create_publisher<std_msgs::msg::Bool>(
+        "/neural/mode_neural_ctrl", 10);
   }
 
   ~NeuralCtrlMode() override = default;
+  
+  // Disable copy, enable move for efficiency
+  NeuralCtrlMode(const NeuralCtrlMode&) = delete;
+  NeuralCtrlMode& operator=(const NeuralCtrlMode&) = delete;
+  NeuralCtrlMode(NeuralCtrlMode&&) noexcept = default;
+  NeuralCtrlMode& operator=(NeuralCtrlMode&&) noexcept = default;
 
 protected:
   void onActivate() override
   {
     _activation_time = _node.get_clock()->now().seconds();
-    _has_goto_cmd = false;
-    _has_rates_sp = false;
-    _interrupt_triggered = false;
+    _has_neural_setpoint = false;
 
-    // Notify neural network node that neural control mode is activated
     auto msg = std_msgs::msg::Bool();
     msg.data = true;
     _start_neural_ctrl_pub->publish(msg);
@@ -101,144 +114,134 @@ protected:
   void onDeactivate() override
   {
     _activation_time = 0;
-    _has_goto_cmd = false;
-    _has_rates_sp = false;
-    _interrupt_triggered = false;
+    _has_neural_setpoint = false;
     RCLCPP_INFO(_node.get_logger(), "NeuralCtrlMode deactivated");
   }
 
   void updateSetpoint(float dt_s) override
   {
-    // Check RC interruption
-    if (_manual_control_input->sticks_moving())
+    if (_manual_control_input->sticks_moving()) [[unlikely]]
     {
       RCLCPP_WARN(_node.get_logger(), "Neural: RC interruption detected!");
       completed(px4_ros2::Result::ModeFailureOther);
       return;
     }
 
-#ifdef USE_GOTO_CTRL
-    generateGotoSetpoint();
-#endif
-
-#ifdef USE_RATES_CTRL
-    generateRatesSetpoint();
-#endif
+    processNeuralSetpoint();
   }
 
 private:
-  std::shared_ptr<px4_ros2::ManualControlInput> _manual_control_input;   // for RC interruption detection
-  std::shared_ptr<px4_ros2::MulticopterGotoSetpointType> _goto_setpoint; // just for placeholder
-  std::shared_ptr<px4_ros2::RatesSetpointType> _rates_setpoint;          // accept rates setpoint from neural network node
-
-  // Subscriptions
-  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr _goto_cmd_sub;
-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr _stop_neural_ctrl_sub;
-  rclcpp::Subscription<px4_msgs::msg::VehicleRatesSetpoint>::SharedPtr _neural_rates_sub;
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr _start_neural_ctrl_pub;
-
-  // Odometry
+  // Hot path data (cache locality optimization)
+  NeuralControlSetpoint _neural_setpoint;
+  rclcpp::Time _neural_setpoint_timestamp;
+  
+  std::shared_ptr<px4_ros2::ManualControlInput> _manual_control_input;
+  std::shared_ptr<px4_ros2::MulticopterGotoSetpointType> _goto_setpoint;
+  std::shared_ptr<px4_ros2::RatesSetpointType> _rates_setpoint;
+  std::shared_ptr<px4_ros2::AccRatesSetpointType> _acc_rates_setpoint;
   std::shared_ptr<px4_ros2::OdometryLocalPosition> _odometry_local_position;
 
-  // *** mode state *** //
-  double _activation_time;
-  // Flags
-  bool _has_goto_cmd;
-  bool _has_rates_sp;
-  bool _interrupt_triggered = false;
-
-  // *** neural control *** //
-  px4_msgs::msg::VehicleRatesSetpoint _rates_sp_msg;
-  float _rates_sp_msg_timeout = 0.05f;
-  rclcpp::Time _rates_sp_msg_timestamp;
-
-  // *** placeholder goto control *** //
-  // State variables
-  Eigen::Vector3f _goto_cmd_target;
-  rclcpp::Time _goto_cmd_timestamp;
-
   // Configuration
-  float _goto_cmd_timeout;
-  float _goto_cmd_max_velocity;
+  NeuralSetpointType _setpoint_type;
+  float _neural_setpoint_timeout;
+  double _activation_time;
+  bool _has_neural_setpoint;
 
-  // Check if position data is valid
-  inline bool isPositionValid() const
+  // ROS2 communication
+  rclcpp::Subscription<NeuralGotoSetpoint>::SharedPtr _goto_sub;
+  rclcpp::Subscription<NeuralRatesSetpoint>::SharedPtr _rates_sub;
+  rclcpp::Subscription<NeuralAccRatesSetpoint>::SharedPtr _acc_rates_sub;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr _stop_neural_ctrl_sub;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr _start_neural_ctrl_pub;
+
+  void subscribeToNeuralSetpoint()
   {
-    return _odometry_local_position->positionXYValid() && _odometry_local_position->positionZValid();
+    auto createSubscription = [this]<typename T>(
+        auto& sub_ptr, const std::string& mode_name) {
+      sub_ptr = _node.create_subscription<T>(
+          "/neural/setpoint", 10,
+          [this](const typename T::SharedPtr msg) {
+            _neural_setpoint = *msg;
+            _neural_setpoint_timestamp = _node.get_clock()->now();
+            _has_neural_setpoint = true;
+          });
+      RCLCPP_INFO(_node.get_logger(), "Neural: Subscribed to %s setpoint", mode_name.c_str());
+    };
+
+    switch (_setpoint_type) {
+      case NeuralSetpointType::Goto:
+        createSubscription.template operator()<NeuralGotoSetpoint>(_goto_sub, "Goto");
+        break;
+      case NeuralSetpointType::Rates:
+        createSubscription.template operator()<NeuralRatesSetpoint>(_rates_sub, "Rates");
+        break;
+      case NeuralSetpointType::AccRates:
+        createSubscription.template operator()<NeuralAccRatesSetpoint>(_acc_rates_sub, "AccRates");
+        break;
+    }
   }
 
-  // Goto setpoint generation using px4-ros2 OdometryLocalPosition API
-  inline void generateGotoSetpoint()
+  inline void processNeuralSetpoint()
   {
-    const auto now = _node.get_clock()->now();
-
-    // Check target data availability and validity
-    if (!_has_goto_cmd)
-    {
+    if (!_has_neural_setpoint) [[unlikely]] {
       RCLCPP_INFO_THROTTLE(_node.get_logger(), *_node.get_clock(), 1000,
-                           "Neural: Waiting for target...");
+                           "Neural: Waiting for setpoint...");
       return;
     }
 
-    // Check target data timeout
-    const float time_since_target = (now - _goto_cmd_timestamp).seconds();
-    if (time_since_target > _goto_cmd_timeout)
-    {
+    const float time_since_setpoint = (_node.get_clock()->now() - _neural_setpoint_timestamp).seconds();
+    if (time_since_setpoint > _neural_setpoint_timeout) [[unlikely]] {
       RCLCPP_ERROR(_node.get_logger(),
-                   "Neural: Target data timeout (%.1fs)", time_since_target);
+                   "Neural: Setpoint timeout (%.3fs)", time_since_setpoint);
       completed(px4_ros2::Result::ModeFailureOther);
       return;
     }
 
-    // Check if position data is available and valid
-    if (!isPositionValid())
-    {
-      RCLCPP_ERROR(_node.get_logger(), "Neural: Position data not available or invalid");
-      completed(px4_ros2::Result::ModeFailureOther);
-      return;
-    }
-
-    _goto_setpoint->update(
-        _goto_cmd_target,       // position target
-        std::nullopt,           // no heading control
-        _goto_cmd_max_velocity, // max horizontal speed
-        _goto_cmd_max_velocity, // max vertical speed
-        std::nullopt            // max heading rate (optional)
-    );
+    std::visit([this](auto&& setpoint) {
+      using T = std::decay_t<decltype(setpoint)>;
+      if constexpr (std::is_same_v<T, NeuralGotoSetpoint>) {
+        applyGotoSetpoint(setpoint);
+      } else if constexpr (std::is_same_v<T, NeuralRatesSetpoint>) {
+        applyRatesSetpoint(setpoint);
+      } else if constexpr (std::is_same_v<T, NeuralAccRatesSetpoint>) {
+        applyAccRatesSetpoint(setpoint);
+      }
+    }, _neural_setpoint);
   }
 
-  inline void generateRatesSetpoint()
+  inline void applyGotoSetpoint(const NeuralGotoSetpoint& setpoint)
   {
-    const auto now = _node.get_clock()->now();
-
-    // Check target data availability and validity
-    if (!_has_rates_sp)
-    {
-      RCLCPP_INFO_THROTTLE(_node.get_logger(), *_node.get_clock(), 1000,
-                           "Neural: Waiting for rate setpoint...");
-      return;
-    }
-
-    // Check rate setpoint data timeout
-    const float time_since_rates_sp = (now - _rates_sp_msg_timestamp).seconds();
-    if (time_since_rates_sp > _rates_sp_msg_timeout)
-    {
-      RCLCPP_ERROR(_node.get_logger(),
-                   "Neural: Rate setpoint data timeout (%.1fs)", time_since_rates_sp);
+    if (!_odometry_local_position->positionXYValid() || 
+        !_odometry_local_position->positionZValid()) [[unlikely]] {
+      RCLCPP_ERROR(_node.get_logger(), "Neural: Position data invalid");
       completed(px4_ros2::Result::ModeFailureOther);
       return;
     }
 
-    const Eigen::Vector3f rates{
-        _rates_sp_msg.roll,
-        _rates_sp_msg.pitch,
-        _rates_sp_msg.yaw};
+    const Eigen::Vector3f target{
+        setpoint.pose.position.x,
+        setpoint.pose.position.y,
+        setpoint.pose.position.z};
 
-    // For multicopters thrust_body[0] and thrust[1] are usually 0 and thrust[2] is the negative throttle demand.
-    const Eigen::Vector3f thrust{
-        _rates_sp_msg.thrust_body[0],
-        _rates_sp_msg.thrust_body[1],
-        _rates_sp_msg.thrust_body[2]};
-    _rates_setpoint->update(rates, thrust);
+    _goto_setpoint->update(target, std::nullopt, 2.0f, 2.0f, std::nullopt);
+  }
+
+  inline void applyRatesSetpoint(const NeuralRatesSetpoint& setpoint)
+  {
+    const Eigen::Vector3f rates_sp{setpoint.roll, setpoint.pitch, setpoint.yaw};
+    const Eigen::Vector3f thrust_sp{
+        setpoint.thrust_body[0],
+        setpoint.thrust_body[1],
+        setpoint.thrust_body[2]};
+    _rates_setpoint->update(rates_sp, thrust_sp);
+  }
+
+  inline void applyAccRatesSetpoint(const NeuralAccRatesSetpoint& setpoint)
+  {
+    const Eigen::Vector3f rates_sp{
+        setpoint.rates[0],
+        setpoint.rates[1],
+        setpoint.rates[2]};
+    _acc_rates_setpoint->update(setpoint.thrust_acc_sp, rates_sp);
   }
 };
