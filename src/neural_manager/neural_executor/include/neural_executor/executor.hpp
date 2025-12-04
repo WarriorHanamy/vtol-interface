@@ -10,9 +10,9 @@
 #include <Eigen/Dense>
 
 using namespace std::chrono_literals; // NOLINT
+// static constexpr uint16_t RC_Neural_Waypoints_Cmds_MASK = 1024;
 
-
-class DemoModeExecutor : public px4_ros2::ModeExecutorBase
+class NeuralExecutor : public px4_ros2::ModeExecutorBase
 {
 public:
   enum class State
@@ -36,7 +36,7 @@ public:
   };
 
   // Constructor: owned_mode is ModeDemoEntry, neural_mode is ModeNeuralCtrl
-  DemoModeExecutor(
+  NeuralExecutor(
     px4_ros2::ModeBase & owned_mode,
     px4_ros2::ModeBase & neural_mode)
   : ModeExecutorBase(
@@ -52,7 +52,7 @@ public:
 
   void onActivate() override
   {
-    RCLCPP_INFO(node().get_logger(), "DemoModeExecutor: Starting mission");
+    RCLCPP_INFO(node().get_logger(), "NeuralExecutor: Starting mission");
     _button_pressed = false;
     _current_nav_state = 0;
     runState(State::TakingOff, px4_ros2::Result::Success);
@@ -60,7 +60,7 @@ public:
 
   void onDeactivate(DeactivateReason reason) override
   {
-    RCLCPP_WARN(node().get_logger(), "DemoModeExecutor: Deactivated");
+    RCLCPP_WARN(node().get_logger(), "NeuralExecutor: Deactivated");
   }
 
   void runState(State state, px4_ros2::Result previous_result)

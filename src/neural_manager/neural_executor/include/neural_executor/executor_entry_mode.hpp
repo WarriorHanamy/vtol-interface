@@ -17,17 +17,17 @@
 #include <px4_ros2/control/setpoint_types/experimental/rates.hpp>
 #include <rclcpp/rclcpp.hpp>
 
-class ModeDemoEntry : public px4_ros2::ModeBase
+class ExecutorEntryMode : public px4_ros2::ModeBase
 {
 public:
-  explicit ModeDemoEntry(rclcpp::Node & node)
-  : ModeBase(node, Settings{"Demo Start"}.activateEvenWhileDisarmed(
+  explicit ExecutorEntryMode(rclcpp::Node & node)
+  : ModeBase(node, Settings{"Neural Executor"}.activateEvenWhileDisarmed(
         true))
   {
     _rates_setpoint = std::make_shared<px4_ros2::RatesSetpointType>(*this);
   }
 
-  ~ModeDemoEntry() override = default;
+  ~ExecutorEntryMode() override = default;
 
 protected:
   void updateSetpoint(float dt_s) override
@@ -41,12 +41,12 @@ protected:
   void onActivate() override
   {
     //TODO 检查条件是否满足启动
-    RCLCPP_INFO(node().get_logger(), "ModeDemoEntry activated");
+    RCLCPP_INFO(node().get_logger(), "ExecutorEntryMode activated");
   }
 
   void onDeactivate() override
   {
-    RCLCPP_INFO(node().get_logger(), "ModeDemoEntry deactivated");
+    RCLCPP_INFO(node().get_logger(), "ExecutorEntryMode deactivated");
   }
 
 private:

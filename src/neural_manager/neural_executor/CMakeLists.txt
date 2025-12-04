@@ -20,17 +20,17 @@ include_directories(include ${Eigen3_INCLUDE_DIRS})
 
 # Main executor node
 file(GLOB ${PROJECT_NAME}_SRCS src/*.cpp)
-ament_auto_add_executable(neural_demo_node src/main.cpp)
+ament_auto_add_executable(neural_executor_node src/main.cpp)
 
 
 target_link_libraries(
-    neural_demo_node
+    neural_executor_node
     Eigen3::Eigen
 )
 
 
 install(TARGETS
-        neural_demo_node
+        neural_executor_node
         DESTINATION lib/${PROJECT_NAME})
 
 # Install launch files

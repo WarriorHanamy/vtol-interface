@@ -33,16 +33,13 @@ def generate_launch_description():
         "debug", default_value="false", description="Enable debug output"
     )
 
-    # Parameters for DemoModeExecutor and ModeNeuralCtrl
     common_params = {
         "config_file": LaunchConfiguration("config_file"),
-        # DemoModeExecutor parameters (can override YAML values)
         "position_timeout": 1.0,
         "rc_timeout": 0.5,
         "target_tolerance": 0.5,
         "still_wait_time": 5.0,
         "max_velocity": 8.0,
-        # ModeNeuralCtrl parameters
         "goto_cmd_target_tolerance": 0.5,
         "goto_cmd_position_timeout": 1.0,
         "goto_cmd_target_timeout": 2.0,

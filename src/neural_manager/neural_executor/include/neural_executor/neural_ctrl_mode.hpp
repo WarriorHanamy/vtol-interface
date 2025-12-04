@@ -16,11 +16,11 @@
 #define USE_GOTO_CTRL
 #define USE_RATES_CTRL
 
-class ModeNeuralCtrl : public px4_ros2::ModeBase
+class NeuralCtrlMode : public px4_ros2::ModeBase
 {
 public:
-  explicit ModeNeuralCtrl(rclcpp::Node &arg_node)
-      : ModeBase(arg_node, Settings{"Neural Control"})
+  explicit NeuralCtrlMode(rclcpp::Node &arg_node)
+      : ModeBase(arg_node, Settings{"NeuralControl"})
   {
     // Initialize state
     _activation_time = {0};
@@ -82,7 +82,7 @@ public:
     
   }
 
-  ~ModeNeuralCtrl() override = default;
+  ~NeuralCtrlMode() override = default;
 
 protected:
   void onActivate() override
@@ -104,7 +104,7 @@ protected:
     _has_goto_cmd = false;
     _has_rates_sp = false;
     _interrupt_triggered = false;
-    RCLCPP_INFO(_node.get_logger(), "ModeNeuralCtrl deactivated");
+    RCLCPP_INFO(_node.get_logger(), "NeuralCtrlMode deactivated");
   }
 
   void updateSetpoint(float dt_s) override
