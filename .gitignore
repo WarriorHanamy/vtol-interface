@@ -9,3 +9,7 @@ install/*
 # VSCode
 .vscode/
 .cache/
+
+**__pycache__**
+
+outputs/

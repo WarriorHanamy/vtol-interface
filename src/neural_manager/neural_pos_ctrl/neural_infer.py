@@ -18,38 +18,36 @@ from __future__ import annotations
 
 import math
 import time
-import sys
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
+from omegaconf.omegaconf import OmegaConf, DictConfig
+import hydra
 import rclpy
 import rclpy.node
 import rclpy.qos
 from px4_msgs.msg import VehicleThrustAccSetpoint, VehicleOdometry
 from std_msgs.msg import Bool
 
-from neural_pos_ctrl.math_utils import (
+from math_utils import (
     quaternion_to_euler,
     rotation_matrix_ned_to_body,
     rotation_matrix_body_to_ned,
     quat_rotate_inverse,
 )
 
-try:
-    import onnxruntime as ort
-except ImportError as e:
-    print(f"[FATAL] Critical dependency missing: onnxruntime not found. Error: {e}")
-    print("This node requires ONNX Runtime for neural network inference. Exiting...")
-    sys.exit(1)  # 非0状态码表示异常退出
+import onnxruntime as ort
 
 
 class NeuralControlNode(rclpy.node.Node):
-    """Isaac位置控制神经网络推理节点"""
+    """Neural位置控制神经网络推理节点"""
 
-    def __init__(self):
+    def __init__(self, cfg: DictConfig):
         """初始化推理节点"""
-        super().__init__("neural_pos_ctrl_node", allow_undeclared_parameters=True)
+        super().__init__(cfg.node.name)
+        # Store configuration
+        self.cfg = cfg
 
         # 监控信息
         self._model_loaded = False
@@ -64,49 +62,19 @@ class NeuralControlNode(rclpy.node.Node):
         self._receive_interval_samples = []
         self._sample_interval_samples = []
         self._last_interval_report_time = 0.0
-        self._interval_report_period = 5.0  # 每5秒报告一次平均间隔
+        self._interval_report_period = 5.0
 
-        # 获取参数
-        self.setup_parameters()
-        self.load_parameters()
+        # 加载配置参数
+        self._model_path = Path(cfg.model.path)
+        self._control_rate = cfg.control.update_rate
+        self._control_period = cfg.control.update_period
+        self._target_position = np.array(cfg.target.position, dtype=np.float32)  # NED坐标系
+        self._target_yaw = cfg.target.yaw
+        self._max_roll_pitch_rate = cfg.control.max_roll_pitch_rate
+        self._max_yaw_rate = cfg.control.max_yaw_rate
 
-        # 初始化ONNX模型
-        if self.init_model():
-            # 创建发布者和订阅者
-            self.init_publishers()
-            self.init_subscribers()
-            self.init_timers()
-            self._init_success = True
-            self.get_logger().info("🚀 Isaac位置控制节点初始化成功!")
-        else:
-            self.get_logger().error("❌ 模型初始化失败，节点无法启动")
-
-    def setup_parameters(self):
-        """设置ROS2参数"""
-        # 模型参数
-        self.declare_parameter(
-            "model_path", "invald_initialization.onnx"
-        )
-        self.declare_parameter("control_rate", 100.0)
-        self.declare_parameter("target_position", [0.0, 0.0, 1.5])
-        self.declare_parameter("target_yaw", 0.0)
-
-
-    def load_parameters(self):
-        self._model_path = Path(self.get_parameter("model_path").value)
-        # 控制参数
-        self._control_rate = self.get_parameter("control_rate").value
-        self._control_period = 1.0 / self._control_rate
-        # 目标参数
-        target_pos = self.get_parameter("target_position").value
-        self._target_position = np.array(target_pos, dtype=np.float32)  # NED坐标系
-        self._target_yaw = self.get_parameter("target_yaw").value
-
-
-        # 角速度限制参数
-        self._max_roll_pitch_rate = self.get_parameter("max_roll_pitch_rate").value
-        self._max_yaw_rate = self.get_parameter("max_yaw_rate").value
-        self.get_logger().info("参数加载完成:")
+        # Log loaded configuration
+        self.get_logger().info("Hydra配置加载完成:")
         self.get_logger().info(f"  模型路径: {self._model_path}")
         self.get_logger().info(f"  控制频率: {self._control_rate:.1f} Hz")
         self.get_logger().info(f"  目标位置(NED): {self._target_position}")
@@ -116,18 +84,29 @@ class NeuralControlNode(rclpy.node.Node):
         )
         self.get_logger().info(f"  最大偏航角速度: {self._max_yaw_rate:.1f} rad/s")
 
+        # 初始化ONNX模型
+        if self.init_model():
+            # 创建发布者和订阅者
+            self.init_publishers()
+            self.init_subscribers()
+            self.init_timers()
+            self._init_success = True
+            self.get_logger().info("🚀 Neural控制节点初始化成功!")
+        else:
+            self.get_logger().error("❌ 模型初始化失败，节点无法启动")
+
+  
     def init_model(self) -> bool:
         if not self._model_path.exists():
+            self.get_logger().error(f"模型文件不存在: {self._model_path}")
             return False
         self.get_logger().info(f"加载ONNX模型: {self._model_path}")
 
-        # GPU优先，如果可用则使用，否则CPU
-        providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        providers = self.cfg.model.inference.providers
         self._inference_session = ort.InferenceSession(
             str(self._model_path), providers=providers
         )
 
-        # 获取模型输入输出信息
         input_info = self._inference_session.get_inputs()[0]
         output_info = self._inference_session.get_outputs()[0]
 
@@ -144,17 +123,19 @@ class NeuralControlNode(rclpy.node.Node):
             f"  输出: {self._output_name}, 形状: {self._output_shape}"
         )
 
-        # 验证输入形状 (应该为 [1, 20])
-        if not (len(self._input_shape) == 2 and self._input_shape[1] == 20):
+        # 验证输入形状
+        expected_input_shape = (1, 16)
+        expected_output_shape = (1, 4)
+
+        if self._input_shape != expected_input_shape:
             self.get_logger().error(
-                f"输入形状不匹配，期望 [1, 20]，实际 {self._input_shape}"
+                f"输入形状不匹配，期望 {expected_input_shape}，实际 {self._input_shape}"
             )
             return False
 
-        # 验证输出形状 (应该为 [1, 4])
-        if not (len(self._output_shape) == 2 and self._output_shape[1] == 4):
+        if self._output_shape != expected_output_shape:
             self.get_logger().error(
-                f"输出形状不匹配，期望 [1, 4]，实际 {self._output_shape}"
+                f"输出形状不匹配，期望 {expected_output_shape}，实际 {self._output_shape}"
             )
             return False
 
@@ -168,11 +149,15 @@ class NeuralControlNode(rclpy.node.Node):
         """初始化发布者"""
         # 控制指令发布者
         self._acc_rates_publisher = self.create_publisher(
-            VehicleThrustAccSetpoint, "/neural/setpoint", 10
+            VehicleThrustAccSetpoint,
+            self.cfg.node.setpoint_topic,
+            1
         )
 
         self._controller_heartbeat_publisher = self.create_publisher(
-            Bool, "/neural/controller_heartbeat", 10
+            Bool,
+            self.cfg.node.heartbeat_topic,
+            10
         )
 
         self.get_logger().info("发布者已初始化")
@@ -182,13 +167,16 @@ class NeuralControlNode(rclpy.node.Node):
         # VehicleOdometry
         self._odometry_subscriber = self.create_subscription(
             VehicleOdometry,
-            "/fmu/out/vehicle_odometry",
+            self.cfg.node.odometry_topic,
             self.odometry_callback,
             rclpy.qos.qos_profile_sensor_data,
         )
 
         self._mode_subscriber = self.create_subscription(
-            Bool, "/neural/mode_neural_ctrl", self.mode_callback, 10
+            Bool,
+            self.cfg.node.mode_topic,
+            self.mode_callback,
+            10
         )
 
         self.get_logger().info("订阅者已初始化")
@@ -200,7 +188,10 @@ class NeuralControlNode(rclpy.node.Node):
             self._control_period, self.control_timer_callback
         )
 
-        self._debug_timer = self.create_timer(5.0, self.debug_callback)
+        self._debug_timer = self.create_timer(
+            5.0,
+            self.debug_callback
+        )
 
         self.get_logger().info(f"定时器已初始化，控制周期: {self._control_period:.3f}s")
 
@@ -229,26 +220,27 @@ class NeuralControlNode(rclpy.node.Node):
         ) / 1000.0  # ms
 
         # 检查接收间隔超时
-        if receive_interval > 50.0:  # 50ms超时
+        timeout_ms = self.cfg.control.timeout_ms
+        if receive_interval > timeout_ms:
             self.get_logger().error(
                 f"⚠️ 里程计接收间隔: {receive_interval:.1f} ms，数据过时"
             )
         else:
             # 记录正常的接收间隔用于统计
             self._receive_interval_samples.append(receive_interval)
-            # 限制样本数量（保留最近100个）
+            # 限制样本数量
             if len(self._receive_interval_samples) > 100:
                 self._receive_interval_samples.pop(0)
 
         # 检查采样间隔超时
-        if sample_interval > 50.0:  # 50ms超时
+        if sample_interval > timeout_ms:
             self.get_logger().error(
                 f"⚠️ 里程计采样间隔: {sample_interval:.1f} ms，数据过时"
             )
         else:
             # 记录正常的采样间隔用于统计
             self._sample_interval_samples.append(sample_interval)
-            # 限制样本数量（保留最近100个）
+            # 限制样本数量
             if len(self._sample_interval_samples) > 100:
                 self._sample_interval_samples.pop(0)
 
@@ -256,7 +248,7 @@ class NeuralControlNode(rclpy.node.Node):
         current_time = time.time()
         if (
             current_time - self._last_interval_report_time
-            >= self._interval_report_period
+            >= 5.0
         ):
             if self._receive_interval_samples and self._sample_interval_samples:
                 avg_receive = np.mean(self._receive_interval_samples)
@@ -282,7 +274,6 @@ class NeuralControlNode(rclpy.node.Node):
             self.get_logger().warn("无效的里程计数据")
             return
 
-        # 转换为20维观测向量
         observation = self.process_odometry_to_observation(msg)
 
         if observation is None:
@@ -301,23 +292,17 @@ class NeuralControlNode(rclpy.node.Node):
             # 立即发布控制指令
             self.publish_control_command(self._last_action)
 
-            # 输出推理耗时
-            self.get_logger().info(f"🧠 神经网络推理耗时: {inference_time:.2f} ms")
+            # 输出推理耗时（如果启用性能监控）
+            if self.cfg.debug.measure_inference_time:
+                self.get_logger().info(f"🧠 神经网络推理耗时: {inference_time:.2f} ms")
 
             # self._last_odom_sample_time = msg.timestamp_sample
 
     def mode_callback(self, msg: Bool):
         was_active = self._active
         self._active = msg.data
-
         if not was_active and self._active:
             self.get_logger().warn("🧠 启用神经网络控制模式")
-            # 重置状态
-            self._last_action = np.array([0.0, 0.0, 0.0, 0.0])
-        elif was_active and not self._active:
-            self.get_logger().warn("🛑 停用神经网络控制模式")
-            # 发布停止控制指令
-            self.publish_stop_command()
 
     def control_timer_callback(self):
         heartbeat_msg = Bool()
@@ -443,45 +428,43 @@ class NeuralControlNode(rclpy.node.Node):
             return None
 
     def apply_input_saturation(self, observation: np.ndarray) -> np.ndarray:
-        # 线速度限制 (±10 m/s)
-        observation[0:3] = np.clip(observation[0:3], -10.0, 10.0)
+        if not self.cfg.control.input_saturation.enabled:
+            return observation
 
-        # 重力投影限制 (±1.0，归一化后)
-        observation[3:6] = np.clip(observation[3:6], -1.0, 1.0)
+        observation[0:3] = np.clip(
+            observation[0:3],
+            self.cfg.control.input_saturation.linear_velocity[0],
+            self.cfg.control.input_saturation.linear_velocity[1]
+        )
 
-        # 角速度限制 (±20 rad/s)
-        observation[6:9] = np.clip(observation[6:9], -20.0, 20.0)
+        # 角速度限制
+        observation[6:9] = np.clip(
+            observation[6:9],
+            self.cfg.control.input_saturation.angular_velocity[0],
+            self.cfg.control.input_saturation.angular_velocity[1]
+        )
 
-        # 当前水平yaw向量已经归一化 [-1, 1]
-        observation[9:11] = np.clip(observation[9:11], -1.0, 1.0)
+        # 目标位置向量限制
+        observation[11:14] = np.clip(
+            observation[11:14],
+            self.cfg.control.input_saturation.target_position[0],
+            self.cfg.control.input_saturation.target_position[1]
+        )
 
-        # 目标位置向量限制 (±10 m) 符合isaac中训练范围
-        observation[11:14] = np.clip(observation[11:14], -10.0, 10.0)
-
-        # 目标水平yaw向量已经归一化 [-1, 1]
-        observation[14:16] = np.clip(observation[14:16], -1.0, 1.0)
-
-        # 动作限制 [-1, 1]
-        observation[16:20] = np.clip(observation[16:20], -1.0, 1.0)
 
         return observation
 
     def run_inference(self, observation: np.ndarray) -> Optional[np.ndarray]:
         """运行神经网络推理"""
         try:
-            # 准备输入数据
             input_data = observation.reshape(1, -1).astype(np.float32)
 
-            # ONNX推理
             ort_inputs = {self._input_name: input_data}
             ort_outputs = self._inference_session.run(
                 [self._output_name], ort_inputs
             )
 
-            # 提取输出
-            action = ort_outputs[0][0]  
-
-            # 应用输出饱和限制
+            action = ort_outputs[0][0]
             action = np.clip(action, -1.0, 1.0)
 
             return action
@@ -503,16 +486,22 @@ class NeuralControlNode(rclpy.node.Node):
         msg.rates_sp[0] = roll_rate
         msg.rates_sp[1] = pitch_rate
         msg.rates_sp[2] = yaw_rate
-        msg.thrust_acc_sp = 9.8
+        msg.thrust_acc_sp = self.cfg.control.thrust_acc
         self._acc_rates_publisher.publish(msg)
 
 
-def main(args=None):
+@hydra.main(
+    version_base="1.2",
+    config_path="conf",
+    config_name="pos_ctrl_config"
+)
+def main(cfg: DictConfig) -> int:
     """主函数"""
-    rclpy.init(args=args)
+    rclpy.init()
 
     try:
-        node = NeuralControlNode()
+        node = NeuralControlNode(cfg)
+        print(OmegaConf.to_yaml(cfg))
 
         if node._init_success:
             rclpy.spin(node)
@@ -532,6 +521,4 @@ def main(args=None):
 
 
 if __name__ == "__main__":
-    import sys
-
-    sys.exit(main())
+    main()

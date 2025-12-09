@@ -130,3 +130,9 @@ develop-ros2:
         -v {{justfile_directory()}}/justfile:/home/ros/ros2_ws/justfile \
         --name ros2 \
         ros2
+
+
+try:
+    source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    source {{justfile_directory()}}/install/setup.sh && \
+    python3 src/neural_manager/neural_pos_ctrl/neural_infer.py
