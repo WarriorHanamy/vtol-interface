@@ -39,3 +39,6 @@ ENV ROS_DISTRO=humble
 
 # Execute just b command (full build)
 RUN just b
+
+RUN echo "source /home/ros/ros2_ws/install/setup.bash" >> \
+    /home/ros/.bashrc

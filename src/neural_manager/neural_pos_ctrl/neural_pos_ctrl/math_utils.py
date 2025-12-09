@@ -47,14 +47,14 @@ def quaternion_to_euler(q: np.ndarray) -> Tuple[float, float, float]:
     return roll, pitch, yaw
 
 
-def euler_to_quaternion(roll: float, pitch: float, yaw: float) -> np.ndarray:
+def euler_to_quaternion(yaw: float, pitch:float, roll: float) -> np.ndarray:
     """
-    欧拉角转换为四元数
+    欧拉角转换为四元数，内旋顺序ZYX (yaw-pitch-roll)
 
     Args:
-        roll: 横滚角 (弧度)
-        pitch: 俯仰角 (弧度)
         yaw: 偏航角 (弧度)
+        pitch: 俯仰角 (弧度)
+        roll: 横滚角 (弧度)
 
     Returns:
         四元数 [w, x, y, z] (Hamilton约定)
