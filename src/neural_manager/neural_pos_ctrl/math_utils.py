@@ -47,8 +47,7 @@ def quaternion_to_euler(q: np.ndarray) -> Tuple[float, float, float]:
     return roll, pitch, yaw
 
 
-
-def euler_to_quaternion(yaw: float, pitch:float, roll: float) -> np.ndarray:
+def euler_to_quaternion(yaw: float, pitch: float, roll: float) -> np.ndarray:
     """
     欧拉角转换为四元数，内旋顺序ZYX (yaw-pitch-roll)
 
@@ -141,8 +140,8 @@ def quaternion_multiply(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
 
     return np.array([w, x, y, z])
 
-    
-def quat_rotate(q: np.ndarray, v: np.ndarray) -> np.ndarray:
+
+def quat_act_rot(q: np.ndarray, v: np.ndarray) -> np.ndarray:
     """
     使用四元数旋转向量
 
@@ -155,24 +154,18 @@ def quat_rotate(q: np.ndarray, v: np.ndarray) -> np.ndarray:
     Returns:
         旋转后的向量
     """
-    w, x, y, z = q[0], q[1], q[2], q[3]
+    w, u = q[0], q[1:4]
 
-    # 四元数共轭
-    q_conj = np.array([w, -x, -y, -z])
-
-    # 四元数旋转向量 (使用Hamilton约定)
-    result = quaternion_multiply(
-        quaternion_multiply(q, np.array([0.0, v[0], v[1], v[2]])), q_conj
-    )
-
-    return result[1:4]  # 返回向量部分
+    uv = np.cross(u, v)
+    uuv = np.cross(u, uv)
+    return v + 2.0 * (w * uv + uuv)
 
 
-def quat_rotate_inverse(q: np.ndarray, v: np.ndarray) -> np.ndarray:
+def quat_pas_rot(q: np.ndarray, v: np.ndarray) -> np.ndarray:
     """
-    使用四元数逆旋转向量
+    被动旋转，坐标系变化，读数变化
 
-    q_inv * v * q，其中v作为纯四元数[0, vx, vy, vz]
+    q_conj * v * q，其中v作为纯四元数[0, vx, vy, vz]
 
     Args:
         q: 四元数 [w, x, y, z] (Hamilton约定)
@@ -181,29 +174,26 @@ def quat_rotate_inverse(q: np.ndarray, v: np.ndarray) -> np.ndarray:
     Returns:
         旋转后的向量
     """
-    w, x, y, z = q[0], q[1], q[2], q[3]
+    q = q.conj()
+    w, u = q[0], q[1:4]
 
-    # 四元数逆
-    q_inv = np.array([w, -x, -y, -z])
+    uv = np.cross(u, v)
+    uuv = np.cross(u, uv)
+    return v + 2 * (w * uv + uuv)
 
-    # 四元数旋转向量 (使用Hamilton约定)
-    result = quaternion_multiply(
-        quaternion_multiply(q_inv, np.array([0.0, v[0], v[1], v[2]])), q
-    )
-
-    return result[1:4]  # 返回向量部分
 
 def quat_right_multiply_flu_frd(q: np.ndarray) -> np.ndarray:
     """对齐FLU与FRD坐标系"""
     q_flu_frd = np.array([0.0, 1.0, 0.0, 0.0])
-    return quaternion_multiply(q, q_flu_frd)
+    rtn_q = quaternion_multiply(q, q_flu_frd)
+    return normalize_quaternion(rtn_q)
 
 
-def vector_left_multiply_flu_frd(vec: np.ndarray) -> np.ndarray:
-    """对齐FLU与FRD坐标系"""
+def frd_flu_rotate(v: np.ndarray) -> np.ndarray:
+    """对齐FRD与FLU坐标系的向量"""
     q_flu_frd = np.array([0.0, 1.0, 0.0, 0.0])
-    rot_mat_flu_frd = quaternion_to_rotation_matrix(q_flu_frd)
-    return rot_mat_flu_frd @ vec 
+    return quat_pas_rot(q_flu_frd, v)
+
 
 def normalize_quaternion(q: np.ndarray) -> np.ndarray:
     """

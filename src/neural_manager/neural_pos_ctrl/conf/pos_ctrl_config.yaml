@@ -4,10 +4,8 @@
 # Node configuration
 node:
   name: "neural_pos_ctrl_node"
-  heartbeat_topic: "/neural/controller_heartbeat"
-  setpoint_topic: "/neural/setpoint"
+  setpoint_topic: "/neural/control"
   odometry_topic: "/fmu/out/vehicle_odometry"
-  mode_topic: "/neural/mode_neural_ctrl"
 
 # Model configuration
 model:
@@ -25,27 +23,26 @@ model:
 # Control system
 control:
   # Timing
-  update_rate: 100.0  # Hz
-  update_period: 0.01  # seconds
+  update_rate: 100.0 # Hz
+  update_period: 0.01 # seconds
   timeout_ms: 50.0
 
   # Action mapping
-  thrust_acc: 9.8  # m/s^2
-  max_roll_pitch_rate: 3.0  # rad/s
-  max_yaw_rate: 3.0  # rad/s
+  thrust_acc: 9.8 # m/s^2
+  max_roll_pitch_rate: 3.0 # rad/s
+  max_yaw_rate: 3.0 # rad/s
 
   # Input limits
   input_saturation:
     enabled: true
-    linear_velocity: [-5.0, 5.0]      # m/s
-    angular_velocity: [-3.0, 3.0]     # rad/s
-    target_position: [-5.0, 5.0]      # m
-    actions: [-1.0, 1.0]                # normalized
+    linear_velocity: [-5.0, 5.0] # m/s
+    angular_velocity: [-3.0, 3.0] # rad/s
+    target_position: [-5.0, 5.0] # m
+    actions: [-1.0, 1.0] # normalized
 
-# Target configuration
 target:
-  position: [0.0, 0.0, 1.5]  # NED coordinates [North, East, Down] meters
-  yaw: 0.0  # radians
+  position: [0.0, 0.0, -4.0] # NED coordinates [North, East, Down] meters
+  yaw: 0.0 # radians
 
 # Safety limits
 safety:
@@ -57,3 +54,5 @@ debug:
   enabled: false
   verbose_logging: false
   measure_inference_time: true
+  print_observation: true
+  print_control: true
