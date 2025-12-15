@@ -126,15 +126,16 @@ class ActionPostProcessor:
         rate_flu = np.array([roll_rate, pitch_rate, yaw_rate])
         rate_frd = frd_flu_rotate(rate_flu)
 
+
         # Populate message fields
-        msg.rates_sp[0] = rate_frd[0]  # Roll rate (FRD)
-        msg.rates_sp[1] = rate_frd[1]  # Pitch rate (FRD)
-        msg.rates_sp[2] = rate_frd[2]  # Yaw rate (FRD)
-        msg.thrust_acc_sp = thrust_acc  # Thrust acceleration (positive up)
+        msg.rates_sp[0] = float(rate_frd[0])  # Roll rate (FRD)
+        msg.rates_sp[1] = float(rate_frd[1])  # Pitch rate (FRD)
+        msg.rates_sp[2] = float(rate_frd[2])  # Yaw rate (FRD)
+        msg.thrust_acc_sp = float(thrust_acc)  # Thrust acceleration (positive up)
 
         return msg
 
-    def _convert_thrust_to_acceleration(self, thrust_raw: float) -> float:
+    def  _convert_thrust_to_acceleration(self, thrust_raw: float) -> float:
         """
         Convert normalized thrust to acceleration.
 
@@ -146,11 +147,11 @@ class ActionPostProcessor:
         """
         if self._acc_fixed:
             # Use fixed acceleration for debugging
-            return self._thrust_acc_base
+            return float(self._thrust_acc_base)
         else:
             # Convert normalized thrust to acceleration
             # thrust_raw=0 -> base_thrust, thrust_raw=1 -> 2*base_thrust
-            return thrust_raw * self._thrust_acc_base + self._thrust_acc_base
+            return float(thrust_raw * 9.81 + 9.81)
 
     def get_action_limits(self) -> dict:
         """

@@ -39,9 +39,9 @@ class NeuralControlNode(rclpy.node.Node):
 
     def __init__(self, cfg: DictConfig):
         """初始化推理节点"""
-        super().__init__(self.cfg.node.name)
-        # Store configuration
+        # Store configuration first
         self.cfg = cfg
+        super().__init__(self.cfg.node.name)
 
         # Pipeline instance
         self._pipeline: Optional[NeuralInferencePipeline] = None
