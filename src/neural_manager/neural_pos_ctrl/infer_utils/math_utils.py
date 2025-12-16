@@ -174,12 +174,11 @@ def quat_pas_rot(q: np.ndarray, v: np.ndarray) -> np.ndarray:
     Returns:
         旋转后的向量
     """
-    q = q.conj()
     w, u = q[0], q[1:4]
 
     uv = np.cross(u, v)
     uuv = np.cross(u, uv)
-    return v + 2 * (w * uv + uuv)
+    return v + 2.0 * (-w * uv + uuv)
 
 
 def quat_right_multiply_flu_frd(q: np.ndarray) -> np.ndarray:
