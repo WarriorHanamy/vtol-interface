@@ -33,8 +33,22 @@ model:
       input: [1, 20]  # Single observation (no history stacking)
       output: [1, 4]
 
-  # ONNX runtime settings
+  # TensorRT settings (optional, for accelerated inference)
+  tensorrt:
+    enabled: true  # Enable TensorRT acceleration if engine is available
+    engine_path: "${oc.env:INFER_WORKSPACE}/src/neural_manager/neural_pos_ctrl/models/policy_no_thrdyn.trt"
+    auto_build: false  # Automatically build engine from ONNX if not found
+    max_batch_size: 1
+    fp16: true  # Enable FP16 precision for faster inference
+    int8: false  # Enable INT8 precision (requires calibration)
+
+  # Inference backend configuration
   inference:
+    # Backend priority: try in order, fall back to next if unavailable
+    # Available backends: "tensorrt", "onnx_cuda", "onnx_cpu"
+    backends: ["tensorrt", "onnx_cuda", "onnx_cpu"]
+
+    # ONNX runtime providers (used when onnx_cuda or onnx_cpu backend is selected)
     providers: ["CUDAExecutionProvider", "CPUExecutionProvider"]
     validate_shapes: true
     output_clipping:
