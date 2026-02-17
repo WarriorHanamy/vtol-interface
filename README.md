@@ -15,7 +15,7 @@
 ### 📥 克隆仓库
 
 ```bash
-git clone --recursive https://github.com/Arclunar/PX4-ROS2-Bridge.git --depth 1
+git clone --recursive https://github.com/WarriorHanamy/vtol-interface.git --depth 1
 ```
 ### 配置px4_msgs
 ```bash
@@ -379,16 +379,13 @@ ONNX 模型推理
 
 ## 👥 作者信息
 
-**项目维护者**: Arclunar  
-**组织**: [Arclunar](https://github.com/Arclunar)  
-**仓库**: [px4-ros2-interface](https://github.com/Arclunar/px4-ros2-interface)
-
-**贡献者**:
-- WarriorHanamy - 原始仓库贡献者
+**项目维护者**: WarriorHanamy
+**组织**: [WarriorHanamy](https://github.com/WarriorHanamy)
+**仓库**: [vtol-interface](https://github.com/WarriorHanamy/vtol-interface)
 
 **联系方式**:
-- Issues: [GitHub Issues](https://github.com/Arclunar/px4-ros2-interface/issues)
-- Discussions: [GitHub Discussions](https://github.com/Arclunar/px4-ros2-interface/discussions)
+- Issues: [GitHub Issues](https://github.com/WarriorHanamy/vtol-interface/issues)
+- Discussions: [GitHub Discussions](https://github.com/WarriorHanamy/vtol-interface/discussions)
 
 ---
 
@@ -410,6 +407,6 @@ ONNX 模型推理
 
 **如果这个项目对你有帮助，请给一个 ⭐ Star！**
 
-Made with ❤️ by Arclunar
+Made with ❤️ by WarriorHanamy
 
 </div>
