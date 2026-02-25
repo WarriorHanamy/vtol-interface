@@ -1,0 +1,71 @@
+# Example Feature Registry
+# This is an example feature_registry.yaml file demonstrating the structure and usage
+
+registry_version: 1
+
+features:
+  # 3D position error in FLU body frame
+  - name: target_error
+    entrypoint: neural_pos_ctrl.features.target_error
+    description: "Position error vector from target in FLU body frame"
+    pipeline:
+      - transform: subtract
+        inputs: [position_ned, target_position_ned]
+      - transform: rotate_to_body
+        params:
+          frame: flu
+
+  # 3D gravity direction in FLU body frame
+  - name: gravity_projection
+    entrypoint: neural_pos_ctrl.features.gravity_projection
+    description: "Gravity vector projected into FLU body frame"
+    pipeline:
+      - transform: project_vector
+        inputs: [orientation_quat]
+        params:
+          vector: [0, 0, 9.81]
+
+  # 3D angular velocity in FLU body frame
+  - name: angular_velocity
+    entrypoint: neural_pos_ctrl.features.angular_velocity
+    description: "Angular velocity in FLU body frame"
+    pipeline:
+      - transform: frd_to_flu
+        inputs: [angular_velocity_body]
+
+  # 2D current yaw encoding (sin/cos)
+  - name: current_yaw_encoding
+    entrypoint: neural_pos_ctrl.features.yaw_encoding
+    description: "Sin/cos encoding of current yaw angle"
+    pipeline:
+      - transform: quat_to_yaw
+        inputs: [orientation_quat]
+      - transform: angle_to_sincos
+
+  # 3D target position in body frame
+  - name: target_pos_body
+    entrypoint: neural_pos_ctrl.features.target_body
+    description: "Target position expressed in FLU body frame"
+    pipeline:
+      - transform: subtract
+        inputs: [target_position_ned, position_ned]
+      - transform: rotate_to_body
+        params:
+          frame: flu
+
+  # 2D target yaw encoding (sin/cos)
+  - name: target_yaw_encoding
+    entrypoint: neural_pos_ctrl.features.target_yaw
+    description: "Sin/cos encoding of target yaw angle"
+    pipeline:
+      - transform: angle_to_sincos
+        inputs: [target_yaw]
+
+  # 4D previous action (runtime augmented)
+  - name: last_action
+    entrypoint: neural_pos_ctrl.features.action_history
+    description: "Previous action from controller history"
+    pipeline:
+      - transform: fetch_last_action
+        runtime_context:
+          buffer: action_history
