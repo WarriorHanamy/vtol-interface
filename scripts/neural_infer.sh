@@ -10,5 +10,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 source "/opt/ros/${ROS_DISTRO}/setup.bash"
 source "${PROJECT_DIR}/install/setup.sh"
 
+cd "${PROJECT_DIR}"
+
 # Run neural inference
-python3 "${PROJECT_DIR}/src/neural_manager/neural_pos_ctrl/neural_infer.py"
+./agent_bins/python "${PROJECT_DIR}/src/neural_manager/neural_pos_ctrl/neural_infer.py"
