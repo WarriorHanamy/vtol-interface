@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 """
-Neural Demo Launch File
+Neural Executor Launch File
 
-This launch file starts the Neural demo system with:
-- Neural Demo Executor with integrated RC triggering
-- Fake Network Node for trajectory generation
+This launch file starts the Neural Executor system with:
+- Neural Executor Node with integrated RC triggering
+- Configuration for waypoint-based trajectory control
 - Comprehensive failsafe mechanisms
 """
 
@@ -40,7 +40,7 @@ def generate_launch_description():
         "use_sim_time": False,
     }
 
-    # Neural Demo Executor Node
+    # Neural Executor Node
     executor_node = Node(
         package="neural_executor",
         executable="neural_executor_node",

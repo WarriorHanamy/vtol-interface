@@ -4,10 +4,10 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Config px4msgs
-cp "${PROJECT_ROOT}/src/px4_msgs/msg/versioned/"* "${PROJECT_ROOT}/src/px4_msgs/msg/"
+cp "${PROJECT_DIR}/src/px4_msgs/msg/versioned/"* "${PROJECT_DIR}/src/px4_msgs/msg/"
 
 # Source ROS2 setup
 source "/opt/ros/${ROS_DISTRO}/setup.bash"

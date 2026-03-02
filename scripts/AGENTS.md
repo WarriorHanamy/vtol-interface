@@ -37,7 +37,7 @@
 
 ## 特点
 
-- ✅ 无硬编码路径，使用 `SCRIPT_DIR` 和 `PROJECT_ROOT` 动态获取
+- ✅ 无硬编码路径，使用 `SCRIPT_DIR` 和 `PROJECT_DIR` 动态获取
 - ✅ 支持环境变量配置
 - ✅ 每个脚本独立可执行
 - ✅ 遵循 bash 最佳实践（`set -e`）
