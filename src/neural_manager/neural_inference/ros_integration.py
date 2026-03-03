@@ -19,7 +19,7 @@ from typing import Any, Optional, Tuple
 import numpy as np
 
 # Import ControlPublisher for publishing control commands
-from control.control_publisher import ControlPublisher
+from .control.control_publisher import ControlPublisher
 
 # Handle ROS2 imports gracefully
 ROS2_AVAILABLE = False
@@ -240,6 +240,7 @@ class RosSensorBridge:
         Runs at 50 Hz (0.02 second period) to:
         1. Call VtolNeuralInferenceNode.infer() to get control commands
         2. Publish control commands via ControlPublisher
+        3. Update feature provider with last action
         """
         try:
             if self._inference_node is None:
@@ -251,6 +252,9 @@ class RosSensorBridge:
             # Publish control commands
             if control_commands is not None:
                 self._publish_control_commands(control_commands)
+
+                # Update feature provider with last action
+                self._feature_provider.update_last_action(action=control_commands)
         except Exception as e:
             self._get_logger().warning(f"Error in inference callback: {e}")
 
