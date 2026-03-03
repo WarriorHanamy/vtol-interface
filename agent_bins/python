@@ -60,6 +60,7 @@ print_paths_info() {
     echo "ROS_DISTRO: ${ROS_DISTRO}"
     echo "ROS_SETUP: /opt/ros/${ROS_DISTRO}/setup.bash"
     echo "ROS_BOOTSTRAP: ${ROS_BOOTSTRAP_STATUS}"
+    echo "PYTHONPATH: ${PYTHONPATH:-<not set>}"
     echo "================================"
 
     # Verify packages are accessible
@@ -85,6 +86,12 @@ except ImportError as e:
 
 # Load ROS environment before any Python execution
 load_ros_bootstrap
+
+# Check if no arguments provided - print paths by default
+if [ $# -eq 0 ]; then
+    print_paths_info
+    exit 0
+fi
 
 # Check if --print-paths flag is provided
 print_paths_flag=false

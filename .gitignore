@@ -163,6 +163,5 @@ cython_debug/
 Pipfile.lock
 
 
-test*.py
 *.bak
 **/completed-tdd-archives/
