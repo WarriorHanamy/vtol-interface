@@ -1,0 +1,85 @@
+{
+  "tasks": [
+    {
+      "task": "Design ROS Environment Bootstrap Logic",
+      "description": "Define mandatory ROS setup loading behavior for the Python wrapper startup.",
+      "project-dir": "/home/rec/server/vtol-interface",
+      "steps": [
+        {
+          "step": 1,
+          "description": "Define ROS_DISTRO resolution order with default value humble."
+        },
+        {
+          "step": 2,
+          "description": "Define setup file discovery for /opt/ros/<distro>/setup.bash path."
+        },
+        {
+          "step": 3,
+          "description": "Define failure output contract for missing ROS setup file."
+        }
+      ],
+      "acceptance-criteria": "Wrapper startup must always attempt ROS environment loading before Python execution. ROS distro selection must default to humble when ROS_DISTRO is unset. Missing /opt/ros/<distro>/setup.bash must return non-zero exit code with explicit failure message.",
+      "test-plan": {
+        "unit": [
+          "Given ROS_DISTRO is unset, bootstrap logic resolves distro value to humble.",
+          "Given ROS_DISTRO=foxy and /opt/ros/foxy/setup.bash exists, bootstrap logic selects that exact file path.",
+          "Given selected setup path is absent, bootstrap logic emits one failure line and returns non-zero status."
+        ],
+        "integration": [],
+        "e2e-manual": []
+      },
+      "skills": [
+        "tdd-workflow",
+        "testing-safe-protocol"
+      ],
+      "complete": false
+    },
+    {
+      "task": "Integrate ROS Bootstrap Into Python Wrapper",
+      "description": "Update the agent Python wrapper so uv-run Python always inherits ROS Python paths.",
+      "project-dir": "/home/rec/server/vtol-interface",
+      "steps": [
+        {
+          "step": 1,
+          "description": "Insert bootstrap call before constructing final uv run command execution."
+        },
+        {
+          "step": 2,
+          "description": "Preserve current CLI argument forwarding contract for wrapper invocations."
+        },
+        {
+          "step": 3,
+          "description": "Preserve current --print-paths diagnostics output contract for wrapper users."
+        },
+        {
+          "step": 4,
+          "description": "Add diagnostics lines for resolved ROS distro plus setup status."
+        }
+      ],
+      "acceptance-criteria": "Wrapper must source /opt/ros/<distro>/setup.bash before uv execution on every run. Wrapper must execute Python with the exact command uv run --no-sync python. uv-run Python must inherit ROS-related environment variables including PYTHONPATH. Wrapper must fail fast when ROS setup cannot be loaded. --print-paths output must include ROS setup status details.",
+      "test-plan": {
+        "unit": [
+          "With mocked environment map from Task 'Design ROS Environment Bootstrap Logic', command builder prepends ROS setup call before uv run invocation.",
+          "With mock command assembly input, built execution command equals literal uv run --no-sync python before forwarded args.",
+          "With mock CLI args ['script.py','--flag','value'], wrapper forwards args unchanged after bootstrap stage.",
+          "With mock missing setup result from Task 'Design ROS Environment Bootstrap Logic', wrapper exits non-zero without building uv run command.",
+          "With mock successful setup result from Task 'Design ROS Environment Bootstrap Logic', diagnostics formatter includes distro name and setup success marker."
+        ],
+        "integration": [
+          "Connect wrapper with real bootstrap logic from Task 'Design ROS Environment Bootstrap Logic' and verify ROS_DISTRO=humble loads /opt/ros/humble/setup.bash when present.",
+          "Connect wrapper with real bootstrap logic from Task 'Design ROS Environment Bootstrap Logic' and verify child uv Python process prints inherited ROS PYTHONPATH segments.",
+          "Connect wrapper with real bootstrap logic from Task 'Design ROS Environment Bootstrap Logic' and verify missing ROS setup file returns non-zero exit code."
+        ],
+        "e2e-manual": [
+          "Run a representative ROS-aware Python entry via ./agent_bins/python and confirm runtime imports ROS Python modules."
+        ]
+      },
+      "skills": [
+        "tdd-workflow",
+        "testing-safe-protocol",
+        "verification-before-completion"
+      ],
+      "complete": false
+    }
+  ]
+}
