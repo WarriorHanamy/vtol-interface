@@ -98,7 +98,7 @@
         "e2e-manual": []
       },
       "skills": ["tdd-workflow"],
-      "complete": false
+      "complete": true
     },
     {
       "task": "Write unit tests for revision discovery",

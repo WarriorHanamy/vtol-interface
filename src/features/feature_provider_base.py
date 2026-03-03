@@ -19,6 +19,8 @@ from typing import List, Optional
 import numpy as np
 import yaml
 
+from .revision_discoverer import RevisionDiscoverer
+
 
 # =============================================================================
 # Data Classes
@@ -94,6 +96,47 @@ class FeatureProviderBase:
 
         # Print validation report
         self._print_validation_report(self._validation_results)
+
+    @classmethod
+    def from_latest_revision(cls, artifacts_root: Path | str, task: str):
+        """
+        Create a FeatureProviderBase instance by auto-discovering the latest revision.
+
+        This method uses RevisionDiscoverer to find the latest valid revision for
+        the given task, then initializes a FeatureProviderBase instance with the
+        metadata from that revision.
+
+        Args:
+            artifacts_root: Base directory containing policies/ subdirectory
+            task: Task name (e.g., "vtol_hover")
+
+        Returns:
+            An initialized FeatureProviderBase instance
+
+        Raises:
+            FileNotFoundError: If no valid revision is found for the given task
+
+        Examples:
+            >>> provider = FeatureProviderBase.from_latest_revision(
+            ...     "/path/to/artifacts", "vtol_hover"
+            ... )
+        """
+        # Discover the latest revision
+        latest_revision = RevisionDiscoverer.discover_latest(artifacts_root, task)
+
+        # Handle case when no valid revision found
+        if latest_revision is None:
+            raise FileNotFoundError(
+                f"No valid revision found for task '{task}' in artifacts_root '{artifacts_root}'. "
+                f"Ensure that '{Path(artifacts_root)}/policies/{task}/' exists and "
+                f"contains at least one valid revision directory with both "
+                f"'model.onnx' and 'observations_metadata.yaml' files."
+            )
+
+        # Construct metadata path and create instance
+        metadata_path = latest_revision / "observations_metadata.yaml"
+
+        return cls(metadata_path)
 
     def _load_metadata(self) -> List[FeatureSpec]:
         """
