@@ -12,11 +12,13 @@ from .feature_provider_base import (
     FeatureSpec,
     FeatureValidationResult,
 )
+from .revision_discoverer import RevisionDiscoverer
 from .vtol_feature_provider import VtolFeatureProvider
 
 __all__ = [
     "FeatureProviderBase",
     "FeatureSpec",
     "FeatureValidationResult",
+    "RevisionDiscoverer",
     "VtolFeatureProvider",
 ]
