@@ -44,7 +44,7 @@
         "e2e-manual": []
       },
       "skills": [],
-      "complete": false
+      "complete": true
     },
     {
       "task": "Create RevisionDiscoverer for task/timestamp discovery",
