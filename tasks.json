@@ -1,118 +1,127 @@
 {
   "tasks": [
     {
-      "task": "Define ROS Environment Bootstrap Contract",
-      "description": "Define deterministic ROS environment loading rules for the agent Python wrapper.",
+      "task": "Simplify FeatureSpec to name and dim only",
+      "description": "Remove dtype and description fields from FeatureSpec in both feature_provider_base.py and model_schema.py.",
       "project-dir": "/home/rec/server/vtol-interface",
       "steps": [
-        {
-          "step": 1,
-          "description": "Define ROS_DISTRO fallback value as humble when input is empty."
-        },
-        {
-          "step": 2,
-          "description": "Define setup file path pattern as /opt/ros/<distro>/setup.bash."
-        },
-        {
-          "step": 3,
-          "description": "Define failure contract with non-zero exit status for missing setup file."
-        }
+        {"step": 1, "description": "Update FeatureSpec in feature_provider_base.py to only have name and dim fields"},
+        {"step": 2, "description": "Update FeatureSpec in model_schema.py to match the simplified structure"},
+        {"step": 3, "description": "Update FeatureValidationResult to remove expected_dim/actual_dim if needed"},
+        {"step": 4, "description": "Update _load_metadata() to parse low_dim format from training exports"},
+        {"step": 5, "description": "Update __init__.py exports if needed"}
       ],
-      "acceptance-criteria": "Wrapper startup must resolve ROS_DISTRO deterministically with default humble. Wrapper startup must derive setup path exactly as /opt/ros/<distro>/setup.bash. Wrapper startup must stop execution with non-zero status when setup file is missing.",
+      "acceptance-criteria": "FeatureSpec dataclass contains only name (str) and dim (int) fields. All references to dtype and description are removed. _load_metadata() correctly parses low_dim format: {'low_dim': [{'name': '...', 'dim': N}, ...]}.",
       "test-plan": {
         "unit": [
-          "Given empty ROS_DISTRO input, resolver returns humble as the selected distro.",
-          "Given ROS_DISTRO=foxy input, resolver returns setup path /opt/ros/foxy/setup.bash.",
-          "Given nonexistent setup path input, bootstrap validator returns a non-zero status with a single explicit error line."
+          "FeatureSpec instantiation with name='to_target_b', dim=3 succeeds",
+          "FeatureSpec raises TypeError when dtype or description arguments are passed",
+          "_load_metadata() parses YAML with low_dim key and returns list of FeatureSpec",
+          "_load_metadata() raises KeyError when low_dim key is missing"
         ],
         "integration": [],
         "e2e-manual": []
       },
-      "skills": [
-        "tdd-workflow",
-        "testing-safe-protocol"
-      ],
-      "complete": true
+      "skills": ["tdd-workflow"],
+      "complete": false
     },
     {
-      "task": "Integrate ROS Bootstrap Into Wrapper Entry",
-      "description": "Update ./agent_bins/python to load ROS setup before launching uv-run Python.",
+      "task": "Remove legacy model_discovery.py",
+      "description": "Delete the old model_discovery.py file and clean up any imports referencing it.",
       "project-dir": "/home/rec/server/vtol-interface",
       "steps": [
-        {
-          "step": 1,
-          "description": "Source resolved ROS setup script before building the final exec command."
-        },
-        {
-          "step": 2,
-          "description": "Preserve current argument forwarding behavior for all wrapper invocations."
-        },
-        {
-          "step": 3,
-          "description": "Keep uv run --no-sync python as the executed interpreter command."
-        }
+        {"step": 1, "description": "Delete src/neural_manager/model_discovery.py"},
+        {"step": 2, "description": "Search and remove any imports of ModelDiscoverer, DiscoveredModel, ModelMetadata"},
+        {"step": 3, "description": "Update neural_manager __init__.py if it exports model_discovery symbols"}
       ],
-      "acceptance-criteria": "Wrapper must source ROS setup before any Python execution path. Wrapper must keep the interpreter command as uv run --no-sync python. Wrapper must preserve positional argument order for target scripts. Wrapper must fail fast when ROS setup loading fails.",
+      "acceptance-criteria": "model_discovery.py file is deleted. No code references ModelDiscoverer, DiscoveredModel, or ModelMetadata classes. Project still imports without errors.",
       "test-plan": {
         "unit": [
-          "Given mocked resolver output from task 'Define ROS Environment Bootstrap Contract', command assembly prepends a source operation before uv invocation.",
-          "Given mock argv ['script.py','--flag','value'], wrapper argument builder returns the same ordered argv after bootstrap stage.",
-          "Given mock bootstrap failure status from task 'Define ROS Environment Bootstrap Contract', wrapper exits non-zero without executing uv run command."
+          "Importing neural_manager package succeeds without model_discovery errors",
+          "grep finds zero matches for 'from model_discovery import' in src/"
+        ],
+        "integration": [],
+        "e2e-manual": []
+      },
+      "skills": [],
+      "complete": false
+    },
+    {
+      "task": "Create RevisionDiscoverer for task/timestamp discovery",
+      "description": "Implement new discovery class that scans policies/<task>/ directories and returns latest revision by timestamp.",
+      "project-dir": "/home/rec/server/vtol-interface",
+      "steps": [
+        {"step": 1, "description": "Create src/features/revision_discoverer.py with RevisionDiscoverer class"},
+        {"step": 2, "description": "Implement discover_latest(artifacts_root, task) method"},
+        {"step": 3, "description": "Implement _parse_revision_name() to extract timestamp from revision directory"},
+        {"step": 4, "description": "Implement _validate_revision() to check model.onnx and observations_metadata.yaml exist"},
+        {"step": 5, "description": "Add RevisionDiscoverer to features/__init__.py exports"}
+      ],
+      "acceptance-criteria": "RevisionDiscoverer.discover_latest(root, task) scans <root>/policies/<task>/ directory, filters valid revisions (both files present), sorts by timestamp descending, returns path to latest revision directory. Returns None if no valid revisions found.",
+      "test-plan": {
+        "unit": [
+          "_parse_revision_name('vtol_hover-20260302T143015Z-abcdef12-a1b2c3d4') returns dict with task, timestamp, commit, hash",
+          "_validate_revision() returns True when both model.onnx and observations_metadata.yaml exist",
+          "_validate_revision() returns False when either file is missing",
+          "discover_latest() returns None when task directory does not exist",
+          "discover_latest() returns None when no valid revisions found"
         ],
         "integration": [
-          "Connect wrapper flow with real rules from task 'Define ROS Environment Bootstrap Contract' and verify ROS_DISTRO=humble loads /opt/ros/humble/setup.bash when present.",
-          "Connect wrapper flow with real rules from task 'Define ROS Environment Bootstrap Contract' and verify child process inherits ROS PYTHONPATH values after setup loading.",
-          "Connect wrapper flow with real rules from task 'Define ROS Environment Bootstrap Contract' and verify missing setup path returns non-zero exit code."
+          "discover_latest() with temp directory containing multiple revisions returns newest by timestamp",
+          "discover_latest() correctly isolates tasks (vtol_hover vs vtol_nav)"
         ],
         "e2e-manual": []
       },
-      "skills": [
-        "tdd-workflow",
-        "testing-safe-protocol",
-        "writing-bash-scripts"
-      ],
-      "complete": true
+      "skills": ["tdd-workflow"],
+      "complete": false
     },
     {
-      "task": "Add ROS Diagnostics For Wrapper Verification",
-      "description": "Extend --print-paths output to report ROS distro, setup file, and bootstrap status.",
+      "task": "Integrate RevisionDiscoverer with FeatureProviderBase",
+      "description": "Add class method to FeatureProviderBase that uses RevisionDiscoverer to auto-discover and initialize from latest revision.",
       "project-dir": "/home/rec/server/vtol-interface",
       "steps": [
-        {
-          "step": 1,
-          "description": "Print resolved ROS_DISTRO value inside --print-paths diagnostics output."
-        },
-        {
-          "step": 2,
-          "description": "Print resolved setup script path inside --print-paths diagnostics output."
-        },
-        {
-          "step": 3,
-          "description": "Print bootstrap success or failure marker in diagnostics output."
-        }
+        {"step": 1, "description": "Add from_latest_revision(artifacts_root, task) class method to FeatureProviderBase"},
+        {"step": 2, "description": "Method uses RevisionDiscoverer to find latest revision path"},
+        {"step": 3, "description": "Method constructs metadata_path and calls __init__"},
+        {"step": 4, "description": "Handle case when no valid revision found with clear error message"}
       ],
-      "acceptance-criteria": "--print-paths output must include resolved ROS_DISTRO. --print-paths output must include setup script absolute path. --print-paths output must include explicit bootstrap status text. Wrapper behavior must remain backward compatible for existing diagnostics lines.",
+      "acceptance-criteria": "FeatureProviderBase.from_latest_revision(root, task) discovers latest revision, loads metadata, validates features, and returns initialized provider instance. Raises FileNotFoundError with clear message if no valid revision found.",
       "test-plan": {
         "unit": [
-          "Given mock diagnostics input with ROS_DISTRO=humble, formatter output contains a ROS_DISTRO line with value humble.",
-          "Given mock diagnostics input with setup path /opt/ros/humble/setup.bash, formatter output contains that exact path string.",
-          "Given mock diagnostics input with bootstrap failure state, formatter output contains a failure marker line."
+          "from_latest_revision() raises FileNotFoundError when no revisions exist",
+          "from_latest_revision() returns FeatureProviderBase instance when valid revision exists"
         ],
         "integration": [
-          "Connect diagnostics path with real wrapper from task 'Integrate ROS Bootstrap Into Wrapper Entry' and verify --print-paths includes ROS lines plus previous package import checks.",
-          "Connect diagnostics path with real wrapper from task 'Integrate ROS Bootstrap Into Wrapper Entry' and verify missing setup path surfaces non-zero status with ROS failure details."
+          "from_latest_revision() with mock revision directory initializes provider with correct metadata",
+          "Provider returned by from_latest_revision() passes feature validation"
         ],
-        "e2e-manual": [
-          "Run ./agent_bins/python --print-paths on a ROS-enabled host and verify reported ROS values match the active shell environment.",
-          "Run a ROS Python import through ./agent_bins/python and verify import succeeds after bootstrap in an interactive shell session."
-        ]
+        "e2e-manual": []
       },
-      "skills": [
-        "tdd-workflow",
-        "testing-safe-protocol",
-        "verification-before-completion"
+      "skills": ["tdd-workflow"],
+      "complete": false
+    },
+    {
+      "task": "Write unit tests for revision discovery",
+      "description": "Create comprehensive test suite for RevisionDiscoverer and FeatureProviderBase integration.",
+      "project-dir": "/home/rec/server/vtol-interface",
+      "steps": [
+        {"step": 1, "description": "Create test/unit/test_revision_discoverer.py"},
+        {"step": 2, "description": "Add tests for _parse_revision_name with valid and invalid formats"},
+        {"step": 3, "description": "Add tests for _validate_revision with various file combinations"},
+        {"step": 4, "description": "Add tests for discover_latest with multiple revisions and timestamps"},
+        {"step": 5, "description": "Add tests for task isolation and missing directories"}
       ],
-      "complete": true
+      "acceptance-criteria": "All tests pass with ./agent_bins/python -m pytest test/unit/test_revision_discoverer.py. Coverage includes: revision name parsing, validation, discovery ordering, task isolation, error handling.",
+      "test-plan": {
+        "unit": [
+          "pytest test/unit/test_revision_discoverer.py passes all tests",
+          "pytest --collect-only shows at least 10 test cases"
+        ],
+        "integration": [],
+        "e2e-manual": []
+      },
+      "skills": ["tdd-workflow", "testing-safe-protocol"],
+      "complete": false
     }
   ]
 }
