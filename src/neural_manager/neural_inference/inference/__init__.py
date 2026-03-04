@@ -22,9 +22,9 @@ except ImportError:
 try:
     from .inference_provider import (
         InferenceProvider,
+        InferenceProviderFactory,
         ONNXProvider,
         TensorRTProvider,
-        InferenceProviderFactory,
     )
 
     _PROVIDER_AVAILABLE = True

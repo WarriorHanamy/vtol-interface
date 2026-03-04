@@ -51,12 +51,12 @@ class VtolFeatureProvider(FeatureProviderBase):
         # Initialize sensor data buffers before calling super().__init__()
         # This is necessary because super().__init__() calls _validate_implementations()
         # which in turn calls the get_{feature_name}() methods that depend on these attributes
-        self._position_ned: Optional[np.ndarray] = None
-        self._velocity_ned: Optional[np.ndarray] = None
-        self._quat: Optional[np.ndarray] = None
-        self._ang_vel_frd: Optional[np.ndarray] = None
-        self._target_pos_ned: Optional[np.ndarray] = None
-        self._last_action: Optional[np.ndarray] = None
+        self._position_ned: np.ndarray | None = None
+        self._velocity_ned: np.ndarray | None = None
+        self._quat: np.ndarray | None = None
+        self._ang_vel_frd: np.ndarray | None = None
+        self._target_pos_ned: np.ndarray | None = None
+        self._last_action: np.ndarray | None = None
 
         # Now call parent class __init__ which will validate implementations
         super().__init__(metadata_path)
@@ -119,7 +119,7 @@ class VtolFeatureProvider(FeatureProviderBase):
     # Feature Get Methods
     # =========================================================================
 
-    def get_to_target_b(self) -> Optional[np.ndarray]:
+    def get_to_target_b(self) -> np.ndarray | None:
         """
         Get target error vector in FLU body frame.
 
@@ -146,7 +146,7 @@ class VtolFeatureProvider(FeatureProviderBase):
 
         return error_flu
 
-    def get_grav_dir_b(self) -> Optional[np.ndarray]:
+    def get_grav_dir_b(self) -> np.ndarray | None:
         """
         Get gravity direction vector in FLU body frame.
 
@@ -172,7 +172,7 @@ class VtolFeatureProvider(FeatureProviderBase):
 
         return gravity_flu_norm
 
-    def get_lin_vel_b(self) -> Optional[np.ndarray]:
+    def get_lin_vel_b(self) -> np.ndarray | None:
         """
         Get linear velocity in FLU body frame.
 
@@ -192,7 +192,7 @@ class VtolFeatureProvider(FeatureProviderBase):
 
         return velocity_flu
 
-    def get_ang_vel_b(self) -> Optional[np.ndarray]:
+    def get_ang_vel_b(self) -> np.ndarray | None:
         """
         Get angular velocity in FLU body frame.
 
@@ -209,7 +209,7 @@ class VtolFeatureProvider(FeatureProviderBase):
 
         return ang_vel_flu
 
-    def get_last_action(self) -> Optional[np.ndarray]:
+    def get_last_action(self) -> np.ndarray | None:
         """
         Get the buffered last action vector.
 

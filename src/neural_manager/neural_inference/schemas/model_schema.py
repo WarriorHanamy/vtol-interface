@@ -1,114 +1,113 @@
 """Model schema definitions for neural inference module."""
 
 from dataclasses import dataclass
-from typing import Dict, Tuple
 
 import yaml
 
 
 @dataclass(frozen=True)
 class FeatureSpec:
-    """Specification for a single feature in the model schema.
+  """Specification for a single feature in the model schema.
 
-    Attributes:
-        name: Unique identifier for the feature.
-        dim: Dimensionality of the feature vector.
-    """
+  Attributes:
+      name: Unique identifier for the feature.
+      dim: Dimensionality of the feature vector.
+  """
 
-    name: str
-    dim: int
+  name: str
+  dim: int
 
 
 @dataclass(frozen=True)
 class ModelSchema:
-    """Schema definition for a neural model.
+  """Schema definition for a neural model.
 
-    Defines the structure of input features and their dimensions.
+  Defines the structure of input features and their dimensions.
 
-    Attributes:
-        schema_version: Version string for the schema format.
-        model_name: Name identifier for the model.
-        features: Tuple of feature specifications.
+  Attributes:
+      schema_version: Version string for the schema format.
+      model_name: Name identifier for the model.
+      features: Tuple of feature specifications.
+  """
+
+  schema_version: str
+  model_name: str
+  features: tuple[FeatureSpec, ...]
+
+  @property
+  def total_obs_dim(self) -> int:
+    """Calculate total observation dimension across all features.
+
+    Returns:
+        Sum of all feature dimensions.
     """
+    return sum(f.dim for f in self.features)
 
-    schema_version: str
-    model_name: str
-    features: Tuple[FeatureSpec, ...]
+  def get_feature_offsets(self) -> dict[str, tuple[int, int]]:
+    """Calculate start and end indices for each feature in the observation vector.
 
-    @property
-    def total_obs_dim(self) -> int:
-        """Calculate total observation dimension across all features.
+    Returns:
+        Dictionary mapping feature names to (start_index, end_index) tuples.
+        The end_index is exclusive (can be used for slicing).
+    """
+    offsets: dict[str, tuple[int, int]] = {}
+    current_offset = 0
 
-        Returns:
-            Sum of all feature dimensions.
-        """
-        return sum(f.dim for f in self.features)
+    for feature in self.features:
+      offsets[feature.name] = (current_offset, current_offset + feature.dim)
+      current_offset += feature.dim
 
-    def get_feature_offsets(self) -> Dict[str, Tuple[int, int]]:
-        """Calculate start and end indices for each feature in the observation vector.
+    return offsets
 
-        Returns:
-            Dictionary mapping feature names to (start_index, end_index) tuples.
-            The end_index is exclusive (can be used for slicing).
-        """
-        offsets: Dict[str, Tuple[int, int]] = {}
-        current_offset = 0
+  @classmethod
+  def from_yaml(cls, path: str) -> "ModelSchema":
+    """Load a ModelSchema from a YAML file.
 
-        for feature in self.features:
-            offsets[feature.name] = (current_offset, current_offset + feature.dim)
-            current_offset += feature.dim
+    Args:
+        path: Path to the YAML file.
 
-        return offsets
+    Returns:
+        ModelSchema instance loaded from the file.
 
-    @classmethod
-    def from_yaml(cls, path: str) -> "ModelSchema":
-        """Load a ModelSchema from a YAML file.
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        yaml.YAMLError: If the file is not valid YAML.
+        KeyError: If required fields are missing.
+    """
+    with open(path) as f:
+      data = yaml.safe_load(f)
 
-        Args:
-            path: Path to the YAML file.
+    schema_version = data["schema_version"]
+    model_name = data["model_name"]
 
-        Returns:
-            ModelSchema instance loaded from the file.
+    features_list = data.get("features", [])
+    features = tuple(
+      FeatureSpec(
+        name=feat["name"],
+        dim=feat["dim"],
+      )
+      for feat in features_list
+    )
 
-        Raises:
-            FileNotFoundError: If the file does not exist.
-            yaml.YAMLError: If the file is not valid YAML.
-            KeyError: If required fields are missing.
-        """
-        with open(path, "r") as f:
-            data = yaml.safe_load(f)
+    return cls(
+      schema_version=schema_version,
+      model_name=model_name,
+      features=features,
+    )
 
-        schema_version = data["schema_version"]
-        model_name = data["model_name"]
+  def get_feature_by_name(self, name: str) -> FeatureSpec:
+    """Retrieve a feature specification by name.
 
-        features_list = data.get("features", [])
-        features = tuple(
-            FeatureSpec(
-                name=feat["name"],
-                dim=feat["dim"],
-            )
-            for feat in features_list
-        )
+    Args:
+        name: The name of the feature to retrieve.
 
-        return cls(
-            schema_version=schema_version,
-            model_name=model_name,
-            features=features,
-        )
+    Returns:
+        The FeatureSpec with the given name.
 
-    def get_feature_by_name(self, name: str) -> FeatureSpec:
-        """Retrieve a feature specification by name.
-
-        Args:
-            name: The name of the feature to retrieve.
-
-        Returns:
-            The FeatureSpec with the given name.
-
-        Raises:
-            KeyError: If no feature with the given name exists.
-        """
-        for feature in self.features:
-            if feature.name == name:
-                return feature
-        raise KeyError(f"Feature '{name}' not found in schema")
+    Raises:
+        KeyError: If no feature with the given name exists.
+    """
+    for feature in self.features:
+      if feature.name == name:
+        return feature
+    raise KeyError(f"Feature '{name}' not found in schema")

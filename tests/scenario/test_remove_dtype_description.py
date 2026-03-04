@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 import ast
+
 import pytest
 
 
@@ -18,7 +19,6 @@ def test_feature_provider_base_no_dtype_or_description():
         / "src"
         / "features"
         / "feature_provider_base.py",
-        "r",
     ) as f:
         content = f.read()
 
@@ -57,7 +57,6 @@ def test_model_schema_no_dtype_or_description():
         / "neural_inference"
         / "schemas"
         / "model_schema.py",
-        "r",
     ) as f:
         content = f.read()
 

@@ -19,7 +19,6 @@ class TestExportRevisionDiscoverer:
     def test_can_import_revision_discoverer_from_features(self):
         """Test that RevisionDiscoverer can be imported from features."""
         # This import should work
-        from features import RevisionDiscoverer
 
         # Should be a class
         assert isinstance(RevisionDiscoverer, type)
@@ -42,7 +41,6 @@ class TestExportRevisionDiscoverer:
 
     def test_revision_discoverer_matches_imported_class(self):
         """Test that RevisionDiscoverer in __all__ matches the imported class."""
-        from features import RevisionDiscoverer
 
         # Should match
         assert features.__all__.count("RevisionDiscoverer") == 1

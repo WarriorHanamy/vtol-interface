@@ -7,8 +7,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-import pytest
 from dataclasses import fields
+
+import pytest
 
 from features.feature_provider_base import FeatureSpec as BaseFeatureSpec
 from neural_manager.neural_inference.schemas.model_schema import (

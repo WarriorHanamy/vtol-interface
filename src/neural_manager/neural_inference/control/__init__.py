@@ -6,7 +6,7 @@ This module provides control output functionality including:
 - Control publisher for publishing control messages
 """
 
-from .control_publisher import ControlPublisher, NeuralControlMessage, ROS2_AVAILABLE
+from .control_publisher import ROS2_AVAILABLE, ControlPublisher, NeuralControlMessage
 
 try:
     from .action_post_processor import ActionPostProcessor
