@@ -5,12 +5,10 @@ services:
     build:
       context: .
       dockerfile: docker/qgc5.dockerfile
-      network: host
     image: qgc5:latest
-    container_name: qgc5
-    restart: unless-stopped
+
+    restart: no
     privileged: true
-    network_mode: host
     environment:
       - DISPLAY=${DISPLAY}
       - QT_X11_NO_MITSHM=1
@@ -34,14 +32,12 @@ services:
     build:
       context: .
       dockerfile: docker/ros2.dockerfile
-      network: host
       args:
         LATETST: "true"
     image: ros2-vtol:latest
-    container_name: ros2-vtol
-    restart: unless-stopped
+
+    restart: no
     privileged: true
-    network_mode: host
     working_dir: /home/ros/ros2_ws
     environment:
       - DISPLAY=${DISPLAY}
@@ -70,10 +66,9 @@ services:
     build:
       context: .
       dockerfile: docker/px4-gazebo.dockerfile
-      network: host
     image: px4-gazebo-harmonic:v1
-    container_name: px4-gazebo-harmonic-tmp
-    restart: unless-stopped
+
+    restart: no
     privileged: true
     environment:
       - DISPLAY=${DISPLAY}
