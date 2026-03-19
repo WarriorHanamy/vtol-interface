@@ -1,0 +1,71 @@
+
+#
+# PX4 Gazebo 8 (Harmonic) dependencies base image
+#
+FROM px4io/px4-dev-base-jammy:2024-05-18
+
+LABEL maintainer="WarriorHanamy <rongerch@outlook.com>"
+
+ENV QT_X11_NO_MITSHM=1
+
+RUN sed -i 's/archive.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list && \
+    sed -i 's/security.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get -y --quiet --no-install-recommends install \
+        ant \
+        binutils \
+        bc \
+        dirmngr \
+        dmidecode \
+        pkg-config \
+        libimage-exiftool-perl \
+        libxml2-utils \
+        mesa-utils \
+        protobuf-compiler \
+        x-window-system
+
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt update && apt install -y \
+    vim \
+    python3-pip python3-venv \
+    curl lsb-release gnupg wget \
+    sudo
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
+ 	&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null \
+ 	&& apt-get update \
+ 	&& DEBIAN_FRONTEND=noninteractive apt-get -y --quiet --no-install-recommends install \
+ 		ant \
+ 		binutils \
+ 		bc \
+ 		dirmngr \
+        dmidecode \
+ 		gz-harmonic \
+        libunwind-dev \
+        gstreamer1.0-libav \
+ 		pkg-config \
+ 		gstreamer1.0-plugins-bad \
+ 		gstreamer1.0-plugins-base \
+ 		gstreamer1.0-plugins-good \
+ 		gstreamer1.0-plugins-ugly \
+ 		libeigen3-dev \
+ 		libgstreamer-plugins-base1.0-dev \
+ 		libimage-exiftool-perl \
+ 		libopencv-dev \
+ 		libxml2-utils \
+ 		mesa-utils \
+ 		protobuf-compiler \
+ 		x-window-system
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y --quiet --no-install-recommends install \
+    libprotobuf-dev

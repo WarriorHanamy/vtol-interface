@@ -60,12 +60,21 @@ services:
         reservations:
           memory: 4G
 
+  # PX4 Dependencies Base Image
+  px4-deps:
+    build:
+      context: .
+      dockerfile: dockerfiles/px4-deps.dockerfile
+    image: px4-deps:jammy-harmonic
+
   # PX4 Gazebo Simulator
   px4:
     build:
       context: .
       dockerfile: dockerfiles/px4-gazebo.dockerfile
     image: px4-gazebo-harmonic-vtol:v1
+    depends_on:
+      - px4-deps
 
     restart: no
     privileged: true
