@@ -21,13 +21,13 @@ import numpy as np
 
 # Handle ROS2 imports gracefully
 ROS2_AVAILABLE = False
-VehicleThrustAccSetpoint = None
+VehicleAccRatesSetpoint = None
 rclpy_node = None
 
 try:
   import rclpy.node as rclpy_node
 
-  from px4_msgs.msg import VehicleThrustAccSetpoint
+  from px4_msgs.msg import VehicleAccRatesSetpoint
 
   ROS2_AVAILABLE = True
 except ImportError:
@@ -62,7 +62,7 @@ class ControlPublisher:
   - acc_p_z: Z-axis acceleration [m/s²]
   - bodyrate: Angular velocity [wx, wy, wz] [rad/s]
 
-  If ROS2 is available and node is provided, uses px4_msgs.VehicleThrustAccSetpoint.
+  If ROS2 is available and node is provided, uses px4_msgs.VehicleAccRatesSetpoint.
   Otherwise, creates a simple mock message for testing.
   """
 
@@ -99,9 +99,9 @@ class ControlPublisher:
 
     try:
       self._publisher = self._node.create_publisher(
-        VehicleThrustAccSetpoint,
+        VehicleAccRatesSetpoint,
         self.TOPIC_NAME,
-        10,  # QoS depth
+        10,
       )
       self._is_initialized = True
 
@@ -124,7 +124,7 @@ class ControlPublisher:
         timestamp: Message timestamp in microseconds
 
     Returns:
-        VehicleThrustAccSetpoint if ROS2 available, otherwise NeuralControlMessage
+        VehicleAccRatesSetpoint if ROS2 available, otherwise NeuralControlMessage
     """
     # Validate inputs
     if not np.isfinite(acc_p_z):
@@ -136,16 +136,16 @@ class ControlPublisher:
     elif not np.all(np.isfinite(bodyrate)):
       bodyrate = np.zeros(3, dtype=np.float32)
 
-    if ROS2_AVAILABLE and VehicleThrustAccSetpoint is not None:
-      # Use PX4 message type
-      msg = VehicleThrustAccSetpoint()
+    if ROS2_AVAILABLE and VehicleAccRatesSetpoint is not None:
+      msg = VehicleAccRatesSetpoint()
       msg.timestamp = timestamp
-      msg.thrust_acc_sp = float(acc_p_z)  # Z-axis acceleration
+      msg.thrust_axis_accp_sp = float(acc_p_z)
       msg.rates_sp = [
-        float(bodyrate[0]),  # wx
-        float(bodyrate[1]),  # wy
-        float(bodyrate[2]),  # wz
+        float(bodyrate[0]),
+        float(bodyrate[1]),
+        float(bodyrate[2]),
       ]
+      msg.sol_time = -1.0
       return msg
     else:
       # Use mock message for testing

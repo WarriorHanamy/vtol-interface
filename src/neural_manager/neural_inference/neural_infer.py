@@ -10,7 +10,7 @@ Isaac Position Control Neural Network Inference Node for PX4 (Refactored)
 1. 订阅VehicleOdometry和mode_neural_ctrl话题
 2. 将PX4 NED坐标系数据转换为Isaac训练格式的观测
 3. 使用ONNX Runtime进行神经网络推理
-4. 发布VehicleRatesSetpoint控制指令
+4. 发布VehicleAccRatesSetpoint控制指令
 
 这个重构版本使用模块化组件架构，提供更好的可测试性和可维护性。
 """
@@ -23,14 +23,9 @@ import hydra
 import numpy as np
 import rclpy
 import rclpy.node
-from infer_utils.action_post_processor import ActionPostProcessor
-
-# Import refactored components
-from infer_utils.actors import GRUPolicyActor, MLPPolicyActor
-from infer_utils.communicator import Communicator
-from infer_utils.history_buffer import ObservationHistoryBuffer
-from infer_utils.inference_pipeline import NeuralInferencePipeline
-from infer_utils.observation_processor import ObservationProcessor
+from control.action_post_processor import ActionPostProcessor
+from inference.actors import GRUPolicyActor, MLPPolicyActor
+from inference.history_buffer import ObservationHistoryBuffer
 from omegaconf.omegaconf import DictConfig, OmegaConf
 
 
@@ -77,7 +72,6 @@ class NeuralControlNode(rclpy.node.Node):
 
       # Create action post processor (matching training environment action processing)
       action_post_processor = ActionPostProcessor(
-        control_mode=self.cfg.control.control_mode,
         max_acc=self.cfg.control.max_acc,
         max_roll_pitch_rate=self.cfg.control.max_roll_pitch_rate,
         max_yaw_rate=self.cfg.control.max_yaw_rate,
@@ -90,7 +84,7 @@ class NeuralControlNode(rclpy.node.Node):
           "max": self.cfg.control.input_saturation.actions[1],
         },
         print_control_commands=self.cfg.debug.print_control,
-        ros_node=self,  # Pass ROS2 node for publishing angular rate commands
+        ros_node=self,
       )
 
       # Create communicator
