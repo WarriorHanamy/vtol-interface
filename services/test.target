@@ -1,6 +1,8 @@
 [Unit]
 Description=Test Executor Group B (test_executor with joystick)
 Conflicts=neural.target
+Wants=test_executor.service
+AllowIsolate=yes
 
 [Install]
 WantedBy=sim-session.service
