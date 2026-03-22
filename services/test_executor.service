@@ -1,0 +1,54 @@
+[Unit]
+Description=Test Executor Service (runs inside ros2 container)
+After=network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+# Dynamic container discovery - find the running ros2 container
+ExecStartPre=/bin/sh -c 'CONTAINER=$$(docker ps --filter "name=ros2" --format "{{.Names}}" | head -n 1); \
+if [ -z "$$CONTAINER" ]; then \
+  echo "Error: ros2 container not found" >&2; \
+  echo "Please start the ros2 container first using 'make sim' or 'docker compose up -d ros2'" >&2; \
+  exit 1; \
+fi; \
+echo "$$CONTAINER"'
+# Joystick readiness probe - checks manual control input before starting
+# This probe is isolated to allow future signal changes without modifying service flow
+ExecStartPre=/bin/sh -c 'CONTAINER=$$(docker ps --filter "name=ros2" --format "{{.Names}}" | head -n 1); \
+echo "Checking joystick readiness..."; \
+echo "Prerequisite: Joystick/RC must be connected and active"; \
+docker exec -u ros "$$CONTAINER" /bin/bash -lc "source /opt/ros/humble/setup.bash && \
+cd /home/ros/ros2_ws && \
+source install/setup.bash && \
+python3 src/neural_manager/neural_executor/scripts/joystick_readiness_probe.py --timeout 5"; \
+PROBE_EXIT=$$?; \
+if [ $$PROBE_EXIT -eq 1 ]; then \
+  echo "Error: Joystick not ready - manual control input is not valid" >&2; \
+  echo "Please ensure:" >&2; \
+  echo "  1. Joystick/RC is connected" >&2; \
+  echo "  2. PX4 is publishing manual control setpoints" >&2; \
+  echo "  3. Joystick is in manual mode (buttons should be active)" >&2; \
+  echo "Current readiness signal: _manual_control_input->buttons() availability" >&2; \
+  exit 1; \
+elif [ $$PROBE_EXIT -eq 2 ]; then \
+  echo "Error: Joystick readiness probe failed" >&2; \
+  exit 1; \
+fi; \
+echo "Joystick ready - starting test executor"'
+# Execute test_neural_executor launch file inside the ros2 container
+ExecStart=/bin/sh -c 'CONTAINER=$$(docker ps --filter "name=ros2" --format "{{.Names}}" | head -n 1); \
+docker exec -u ros "$$CONTAINER" /bin/bash -lc "source /opt/ros/humble/setup.bash && \
+cd /home/ros/ros2_ws && \
+source install/setup.bash && \
+ros2 launch neural_executor test_neural_executor.launch.py"'
+Restart=on-failure
+RestartSec=5
+
+# Security settings for user service
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

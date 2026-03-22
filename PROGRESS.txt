@@ -364,3 +364,144 @@ TESTING RESULTS:
    ✓ Linter: No new linter errors introduced (pre-existing F821 errors not related to this task)
 
 ================================================================================
+================================================================================
+TASK ID: add-test-executor-service
+TASK NAME: Add Test Executor Service
+STATUS: complete
+TIMESTAMP: 2026-03-22T19:17:00Z
+WORKER AGENT: Worker-v2
+================================================================================
+OBJECTIVE (Acceptance Criteria):
+   A repo-managed unit file for test_executor must live under services/ and 
+   install into ~/.config/systemd/user. The service must execute the ROS2 
+   test_neural_executor launch entry inside the running ros2 container without 
+   hard-coded container names. Startup must fail fast with an operator-readable 
+   message when manual control input is not valid. The current readiness check 
+   must accept `_manual_control_input->buttons()` availability as the 
+   joystick-ready signal. The readiness probe must be isolated behind a dedicated 
+   check so future signal changes do not require rewriting the service flow. 
+   Operator guidance must explain the joystick prerequisite, the start command, 
+   and the audit commands for journalctl --user.
+
+STEPS PROVIDED:
+   1. Create an audited unit file under services for test_executor
+   2. Launch test_neural_executor_node through the test_neural_executor launch file
+   3. Add a preflight probe that checks manual control validity before startup
+   4. Use _manual_control_input->buttons() availability as the current joystick-ready signal
+   5. Keep the readiness logic isolated so the signal can be changed later
+   6. Document operator commands for start and audit using systemctl --user
+
+STEPS EXECUTED:
+   ✓ Step 1: Created services/test_executor.service unit file
+   ✓ Step 2: Configured ExecStart to launch test_neural_executor.launch.py
+   ✓ Step 3: Added ExecStartPre with joystick readiness probe
+   ✓ Step 4: Implemented buttons() availability check in probe script
+   ✓ Step 5: Isolated readiness logic in separate joystick_readiness_probe.py script
+   ✓ Step 6: Created comprehensive operator documentation in services/test_executor_README.md
+
+WORK COMPLETED:
+   1. Created services/test_executor.service (54 lines):
+      - Dynamic container discovery using "docker ps --filter 'name=ros2'"
+      - ExecStartPre runs joystick readiness probe before service start
+      - ExecStart launches test_neural_executor.launch.py inside ros2 container
+      - Fail-fast with operator-readable error messages on joystick not ready
+      - Restart policy: on-failure with 5 second interval
+      - Security settings: NoNewPrivileges=true, PrivateTmp=true
+   2. Created src/neural_manager/neural_executor/scripts/joystick_readiness_probe.py:
+      - Subscribes to /fmu/in/manual_control_setpoint topic
+      - Checks _manual_control_input->buttons() availability as readiness signal
+      - Isolated readiness check logic for future signal changes
+      - Returns exit code 0 when ready, 1 when not ready, 2 on error
+      - Configurable timeout (default 5 seconds)
+   3. Updated install-neural-services.sh:
+      - Added test_executor.service to SERVICES array
+      - Installation script creates symlink to ~/.config/systemd/user
+   4. Created services/test_executor_README.md:
+      - Comprehensive operator documentation
+      - Explains joystick prerequisite and current readiness signal
+      - Documents start/stop/enable/disable systemctl commands
+      - Provides multiple journalctl --user audit examples
+      - Includes troubleshooting section with common issues
+      - Documents "Advanced: Modifying Readiness Signal" for future changes
+
+FILES MODIFIED:
+   - services/test_executor.service (created, 54 lines)
+   - src/neural_manager/neural_executor/scripts/joystick_readiness_probe.py (created, 134 lines)
+   - services/test_executor_README.md (created, 242 lines)
+   - install-neural-services.sh (modified, added test_executor.service to SERVICES array)
+   - src/neural_manager/neural_executor/scripts/ (created directory)
+
+KEY DECISIONS:
+   - Used separate Python script for readiness probe to ensure isolation
+   - Implemented buttons() availability check as current readiness signal
+   - Used dynamic container discovery to avoid hard-coded container names
+   - Set 5-second timeout for joystick readiness check
+   - Included detailed error messages in ExecStartPre for operator guidance
+   - Documented readiness signal isolation for future extensibility
+
+BLOCKERS RESOLVED:
+   - None
+
+REMAINING ISSUES:
+   - None
+
+NOTES FOR NEXT AGENT:
+   - Readiness probe is isolated in joystick_readiness_probe.py for easy modification
+   - Service requires ros2 container to be running before start
+   - Joystick must be connected and active for service to start
+   - Current readiness signal is _manual_control_input->buttons() availability
+   - Service file uses ExecStartPre for preflight checks
+   - All documentation is operator-friendly and comprehensive
+
+ACCEPTANCE CRITERIA VERIFICATION:
+   ✓ Criterion 1: A repo-managed unit file for test_executor must live under services/ and install into ~/.config/systemd/user
+     - VERIFIED: File created at services/test_executor.service
+     - VERIFIED: install-neural-services.sh includes test_executor.service in SERVICES array
+     - VERIFIED: Installation script creates symlink to ~/.config/systemd/user/test_executor.service
+     - Evidence: systemd-analyze verify shows no errors for test_executor.service
+
+   ✓ Criterion 2: The service must execute the ROS2 test_neural_executor launch entry inside the running ros2 container without hard-coded container names
+     - VERIFIED: Uses dynamic container discovery: "docker ps --filter 'name=ros2' --format '{{.Names}}' | head -n 1"
+     - VERIFIED: No hard-coded container names in service file
+     - VERIFIED: ExecStart executes "ros2 launch neural_executor test_neural_executor.launch.py"
+     - Evidence: Lines 10-15, 19-40, and 41-45 of test_executor.service
+
+   ✓ Criterion 3: Startup must fail fast with an operator-readable message when manual control input is not valid
+     - VERIFIED: ExecStartPre runs joystick readiness probe (line 25)
+     - VERIFIED: Probe exits with code 1 when joystick not ready
+     - VERIFIED: Service outputs error to stderr: "Error: Joystick not ready - manual control input is not valid"
+     - VERIFIED: Service includes diagnostic steps for operator (lines 29-33)
+     - VERIFIED: Service exits immediately on probe failure (line 28: exit 1)
+     - Evidence: Lines 19-40 of test_executor.service
+
+   ✓ Criterion 4: The current readiness check must accept `_manual_control_input->buttons()` availability as the joystick-ready signal
+     - VERIFIED: Probe script subscribes to /fmu/in/manual_control_setpoint (line 45)
+     - VERIFIED: Probe checks "msg.buttons is not None and msg.buttons != 0" (line 62)
+     - VERIFIED: Service documentation states: "Current readiness signal: _manual_control_input->buttons() availability"
+     - VERIFIED: README explains current readiness signal in "Prerequisites" section
+     - Evidence: joystick_readiness_probe.py lines 45, 62-66
+
+   ✓ Criterion 5: The readiness probe must be isolated behind a dedicated check so future signal changes do not require rewriting the service flow
+     - VERIFIED: Readiness logic in separate script: joystick_readiness_probe.py
+     - VERIFIED: Service only calls probe script, does not implement check logic
+     - VERIFIED: Probe script contains "FUTURE: Modify this function to change the readiness signal"
+     - VERIFIED: Probe script documents isolation: "This probe is isolated to allow future changes"
+     - VERIFIED: README includes section "Advanced: Modifying Readiness Signal"
+     - Evidence: joystick_readiness_probe.py lines 8, 57, 63; README lines 179-193
+
+   ✓ Criterion 6: Operator guidance must explain the joystick prerequisite, the start command, and the audit commands for journalctl --user
+     - VERIFIED: README section "Prerequisites" explains joystick/RC requirement
+     - VERIFIED: README section "Prerequisites" explains "_manual_control_input->buttons() availability"
+     - VERIFIED: README section "Starting the Service" includes "systemctl --user start test_executor.service"
+     - VERIFIED: README section "Service Logs and Auditing" includes multiple journalctl --user examples
+     - VERIFIED: README includes common audit queries section
+     - Evidence: README.md lines 8-27, 50-51, 71-100
+
+TESTING RESULTS:
+   ✓ Service file syntax: systemd-analyze verify shows no errors
+   ✓ Python script syntax: py_compile shows no syntax errors
+   ✓ All 6 acceptance criteria verified with code inspection and command output
+   ✓ Documentation is comprehensive and operator-friendly
+   ✓ Readiness probe is properly isolated for future extensibility
+
+================================================================================

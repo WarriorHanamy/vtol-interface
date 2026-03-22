@@ -66,7 +66,7 @@ echo "Target: ${USER_SYSTEMD_DIR}"
 echo ""
 
 # Install services
-SERVICES=("neural_executor.service" "neural_infer.service")
+SERVICES=("neural_executor.service" "neural_infer.service" "test_executor.service")
 FAILED=()
 
 for service in "${SERVICES[@]}"; do
@@ -100,10 +100,13 @@ if [ ${#FAILED[@]} -eq 0 ]; then
     echo "  systemctl --user start neural_executor.service"
     echo "  systemctl --user enable neural_infer.service"
     echo "  systemctl --user start neural_infer.service"
+    echo "  systemctl --user enable test_executor.service"
+    echo "  systemctl --user start test_executor.service"
     echo ""
     echo "To check service status:"
     echo "  systemctl --user status neural_executor.service"
     echo "  systemctl --user status neural_infer.service"
+    echo "  systemctl --user status test_executor.service"
     exit 0
 else
     echo -e "${RED}=================================================="
