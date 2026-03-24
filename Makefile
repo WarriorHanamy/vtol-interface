@@ -56,21 +56,20 @@ sim-legacy: sim-kill
 sim:
 	@echo ">>> Granting X11 access to docker..."
 	@xhost +local:docker 2>/dev/null || true
+	@echo ">>> Passing DISPLAY to systemd..."
+	@systemctl --user import-environment DISPLAY
 	@echo ">>> Starting simulation session via systemd..."
 	@systemctl --user start sim-session.service
 	@echo ">>> Waiting for ros2 container to be ready..."
 	@for i in $$(seq 1 30); do \
 		if docker ps --filter "name=ros2" --format "{{.Names}}" | grep -q .; then \
 			echo ">>> ros2 container ready"; \
-			echo ">>> Starting neural services (Group A)..."; \
-			systemctl --user start neural.target; \
 			echo ">>> Done. Use 'make sim-attach' to attach to tmux."; \
 			exit 0; \
 		fi; \
 		sleep 1; \
 	done; \
-	echo "Warning: ros2 container not ready after 30s"; \
-	echo "Start neural services manually with: make neural"
+	echo "Warning: ros2 container not ready after 30s"
 
 sim-kill:
 	@echo ">>> Stopping simulation session..."
