@@ -36,6 +36,7 @@ services:
       - ${HOME}/sim2sim:/home/qgc/ulgs/
       - /dev/input:/dev/input
     command: qgc
+    ipc: host
     network_mode: host
     deploy:
       resources:
@@ -70,6 +71,7 @@ services:
     stdin_open: true
     tty: true
     command: bash
+    ipc: host
     network_mode: host
     deploy:
       resources:
@@ -107,8 +109,9 @@ services:
       - ACCEPT_EULA=Y
       - PRIVACY_CONSENT=Y
     volumes:
-      - ${HOME}/.Xauthority:/root/.Xauthority
       - /tmp/.X11-unix:/tmp/.X11-unix
+      - ${HOME}/.Xauthority:/tmp/.docker.xauth:ro
+    ipc: host
     command: runsim.sh 2
     stdin_open: true
     tty: true
