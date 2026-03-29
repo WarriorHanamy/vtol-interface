@@ -1,4 +1,4 @@
-.PHONY: build
+.PHONY: build list
 
 TMP_SRC := /tmp/vtol-interface-src
 
@@ -157,3 +157,11 @@ logs-web:
 	@echo ""
 	@echo "To stop log_streamer service:"
 	@echo "  docker compose stop log_streamer"
+
+# =============================================================================
+# Help
+# =============================================================================
+
+list:
+	@echo "Available targets:"
+	@sed -n 's/^\([a-zA-Z_-][a-zA-Z0-9_-]*\):.*/  \1/p' $(MAKEFILE_LIST) | sort -u
