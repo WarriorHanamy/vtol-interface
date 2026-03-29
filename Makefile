@@ -1,4 +1,4 @@
-.PHONY: build list
+.PHONY: build list docker-offload-build
 
 TMP_SRC := /tmp/vtol-interface-src
 
@@ -9,6 +9,24 @@ build:
 	docker compose run --rm \
 		-v $(TMP_SRC):/home/ros/ros2_ws/src \
 		ros2 bash -c "cp -r src/px4_msgs/msg/versioned/* src/px4_msgs/msg/ && source /opt/ros/humble/setup.bash && colcon build"
+
+# =============================================================================
+# Build Offload (for AI decision-making)
+# =============================================================================
+
+VTOL_OFFLOAD_CONTAINER ?= vtol-build-offload
+
+docker-offload-build:
+	@docker rm -f $(VTOL_OFFLOAD_CONTAINER) > /dev/null 2>&1 || true
+	@mkdir -p build
+	@docker run --rm -d --name $(VTOL_OFFLOAD_CONTAINER) ros2:humble sleep infinity
+	@docker cp src/. $(VTOL_OFFLOAD_CONTAINER):/home/ros/ros2_ws/src/
+	@docker exec $(VTOL_OFFLOAD_CONTAINER) bash -lc \
+		"cp -r src/px4_msgs/msg/versioned/* src/px4_msgs/msg/ && \
+		 source /opt/ros/humble/setup.bash && \
+		 colcon build 2>&1" | tee build/compile.log
+	@docker stop $(VTOL_OFFLOAD_CONTAINER) > /dev/null
+	@echo ">>> Build log: build/compile.log"
 
 # =============================================================================
 # Submodule Sync
