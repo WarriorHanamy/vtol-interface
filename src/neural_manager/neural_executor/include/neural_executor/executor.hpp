@@ -38,9 +38,15 @@ public:
       owned_mode),
     _neural_mode(neural_mode),
     _context(std::make_unique<px4_ros2::Context>(node())),
-    _vehicle_status(std::make_unique<px4_ros2::VehicleStatus>(*_context)),
-    _manual_control_input(std::make_unique<px4_ros2::ManualControlInput>(*_context, true))
+    _vehicle_status(std::make_unique<px4_ros2::VehicleStatus>(
+      *_context
+    )),
+    _manual_control_input(std::make_unique<px4_ros2::ManualControlInput>(
+      *_context,
+      false
+    ))
   {
+    RCLCPP_INFO(node().get_logger(), "VehicleStatus and ManualControlInput are required dependencies");
     _rc_poll_timer = node().create_wall_timer(50ms, [this]() { handleRCInput(); });
 
     _neural_control_sub = node().create_subscription<px4_msgs::msg::VehicleAccRatesSetpoint>(
