@@ -9,6 +9,7 @@ dependencies = [
   "seaborn",
   "onnxruntime",
   "hydra-core",
+  "eclipse-zenoh", # for px4 firmware debugs
 ]
 description = "Inference python"
 license = {text = "BSD"}
