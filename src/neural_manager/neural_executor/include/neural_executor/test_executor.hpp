@@ -16,6 +16,7 @@
 #include <px4_ros2/vehicle_state/vehicle_status.hpp>
 #include <px4_ros2/components/manual_control_input.hpp>
 #include <px4_msgs/msg/vehicle_status.hpp>
+#include <neural_executor/mavlink_logger.hpp>
 
 using namespace std::chrono_literals;
 
@@ -46,17 +47,20 @@ public:
     _manual_control_input(std::make_unique<px4_ros2::ManualControlInput>(*_context, true))
   {
     _rc_poll_timer = node().create_wall_timer(50ms, [this]() { handleRCInput(); });
+    _mavlink_logger = std::make_unique<neural_executor::MavlinkLogger>(node());
   }
 
   void onActivate() override
   {
     RCLCPP_INFO(node().get_logger(), "TestExecutor: Starting mission");
+    _mavlink_logger->info("[Test] Executor activated");
     runState(State::TakingOff, px4_ros2::Result::Success);
   }
 
   void onDeactivate(DeactivateReason reason) override
   {
     RCLCPP_WARN(node().get_logger(), "TestExecutor: Deactivated");
+    _mavlink_logger->warning("[Test] Executor deactivated");
   }
 
   void runState(State state, px4_ros2::Result previous_result)
@@ -66,9 +70,11 @@ public:
 
       if (state == State::TakingOff) {
         RCLCPP_WARN(node().get_logger(), "Takeoff failed, switching to Position mode to wait for RC trigger");
+        _mavlink_logger->error("[Test] Takeoff failed");
       }
 
       RCLCPP_WARN(node().get_logger(), "State operation failed, falling back to Position mode");
+      _mavlink_logger->warning("[Test] Falling back to Position mode");
       runState(State::Position, px4_ros2::Result::Success);
       return;
     }
@@ -76,6 +82,7 @@ public:
     switch (state) {
       case State::TakingOff:
         RCLCPP_INFO(node().get_logger(), "State: TakingOff");
+        _mavlink_logger->info("[Test] Taking off");
         takeoff([this](px4_ros2::Result result) {
           runState(State::Position, result);
         });
@@ -84,20 +91,25 @@ public:
       case State::Position:
         if (_vehicle_status->navState() != POSCTL_NAV_STATE) {
           RCLCPP_INFO(node().get_logger(), "State: Position - switching to Position mode");
+          _mavlink_logger->info("[Test] Switching to Position mode");
           scheduleMode(px4_ros2::ModeBase::kModeIDPosctl, [this](px4_ros2::Result pos_result) {
             handlePositionSwitchResult(pos_result);
           });
         }
         RCLCPP_INFO(node().get_logger(), "State: Position - waiting for RC trigger");
+        _mavlink_logger->notice("[Test] Ready - waiting RC trigger");
         break;
 
       case State::NeuralManual:
         RCLCPP_INFO(node().get_logger(), "State: NeuralManual");
+        _mavlink_logger->info("[Test] Entering NeuralManual mode");
         scheduleMode(_neural_manual_mode.id(), [this](px4_ros2::Result result) {
           if (result == px4_ros2::Result::Success) {
             RCLCPP_INFO(node().get_logger(), "NeuralManual succeeded - continuing in NeuralManual mode");
+            _mavlink_logger->info("[Test] NeuralManual completed");
           } else {
             RCLCPP_WARN(node().get_logger(), "NeuralManual failed/interrupted, returning to Position");
+            _mavlink_logger->warning("[Test] NeuralManual interrupted");
             runState(State::Position, px4_ros2::Result::ModeFailureOther);
           }
         });
@@ -105,6 +117,7 @@ public:
 
       case State::WaitingStill:
         RCLCPP_INFO(node().get_logger(), "State: WaitingStill - waiting before landing");
+        _mavlink_logger->info("[Test] Waiting before landing");
         _still_wait_start_time = node().get_clock()->now();
         _still_check_timer = node().create_wall_timer(
           std::chrono::milliseconds(500),
@@ -122,6 +135,7 @@ public:
 
       case State::Land:
         RCLCPP_INFO(node().get_logger(), "State: Land");
+        _mavlink_logger->info("[Test] Landing");
         land([this](px4_ros2::Result result) {
           runState(State::WaitUntilDisarmed, result);
         });
@@ -129,8 +143,10 @@ public:
 
       case State::WaitUntilDisarmed:
         RCLCPP_INFO(node().get_logger(), "State: WaitUntilDisarmed");
+        _mavlink_logger->info("[Test] Waiting until disarmed");
         waitUntilDisarmed([this](px4_ros2::Result) {
           RCLCPP_INFO(node().get_logger(), "Mission complete");
+          _mavlink_logger->info("[Test] Mission complete");
         });
         break;
     }
@@ -150,8 +166,11 @@ private:
   bool _aux1_high_last{false};
   bool _button_pressed_last{false};
 
+  std::unique_ptr<neural_executor::MavlinkLogger> _mavlink_logger;
+
   void handleRCInput()
   {
+    if (!_vehicle_status->lastValid()) return;
     if (_vehicle_status->navState() != POSCTL_NAV_STATE) return;
     if (!_manual_control_input->isValid()) return;
 
@@ -176,18 +195,23 @@ private:
     switch (result) {
       case px4_ros2::Result::Rejected:
         RCLCPP_ERROR(node().get_logger(), "Failed to switch to Position mode: Rejected");
+        _mavlink_logger->error("[Test] Position mode rejected");
         break;
       case px4_ros2::Result::Timeout:
         RCLCPP_ERROR(node().get_logger(), "Failed to switch to Position mode: Timeout");
+        _mavlink_logger->error("[Test] Position mode timeout");
         break;
       case px4_ros2::Result::Interrupted:
         RCLCPP_ERROR(node().get_logger(), "Position mode switch interrupted");
+        _mavlink_logger->error("[Test] Position mode interrupted");
         break;
       case px4_ros2::Result::Deactivated:
         RCLCPP_WARN(node().get_logger(), "Position mode is deactivated");
+        _mavlink_logger->warning("[Test] Position mode deactivated");
         break;
       default:
         RCLCPP_ERROR(node().get_logger(), "Schedule position mode failed: %s", resultToString(result));
+        _mavlink_logger->error("[Test] Position mode failed");
         break;
     }
   }

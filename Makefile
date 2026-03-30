@@ -1,30 +1,21 @@
-.PHONY: build list docker-offload-build
-
-TMP_SRC := /tmp/vtol-interface-src
-
-build:
-	@echo ">>> Copying src to $(TMP_SRC)..."
-	@rm -rf $(TMP_SRC)
-	@cp -r src $(TMP_SRC)
-	docker compose run --rm \
-		-v $(TMP_SRC):/home/ros/ros2_ws/src \
-		ros2 bash -c "cp -r src/px4_msgs/msg/versioned/* src/px4_msgs/msg/ && source /opt/ros/humble/setup.bash && colcon build"
+.PHONY: list docker-offload-build
 
 # =============================================================================
 # Build Offload (for AI decision-making)
 # =============================================================================
 
 VTOL_OFFLOAD_CONTAINER ?= vtol-build-offload
+VTOL_OFFLOAD_IMAGE ?= ros2-vtol:latest
 
 docker-offload-build:
 	@docker rm -f $(VTOL_OFFLOAD_CONTAINER) > /dev/null 2>&1 || true
 	@mkdir -p build
-	@docker run --rm -d --name $(VTOL_OFFLOAD_CONTAINER) ros2:humble sleep infinity
-	@docker cp src/. $(VTOL_OFFLOAD_CONTAINER):/home/ros/ros2_ws/src/
+	@docker run --rm -d --name $(VTOL_OFFLOAD_CONTAINER) $(VTOL_OFFLOAD_IMAGE) sleep infinity
+	@docker cp src/neural_manager $(VTOL_OFFLOAD_CONTAINER):/home/ros/ros2_ws/src/
+	@docker cp src/px4-ros2-interface-lib $(VTOL_OFFLOAD_CONTAINER):/home/ros/ros2_ws/src/
 	@docker exec $(VTOL_OFFLOAD_CONTAINER) bash -lc \
-		"cp -r src/px4_msgs/msg/versioned/* src/px4_msgs/msg/ && \
-		 source /opt/ros/humble/setup.bash && \
-		 colcon build 2>&1" | tee build/compile.log
+		"source /opt/ros/humble/setup.bash && \
+		 colcon build --packages-select neural_executor px4_ros2_cpp 2>&1" | tee build/compile.log
 	@docker stop $(VTOL_OFFLOAD_CONTAINER) > /dev/null
 	@echo ">>> Build log: build/compile.log"
 
