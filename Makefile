@@ -1,4 +1,4 @@
-.PHONY: list docker-offload-build docker-px4-build docker-ros2-build
+.PHONY: list docker-offload-build docker-px4-build docker-ros2-build docker-shell
 
 # =============================================================================
 # Build ROS2 Image (layered by change frequency)
@@ -174,6 +174,9 @@ sim-status:
 sim-attach:
 	@tmux attach -t vtol-sim 2>/dev/null || echo "Session not running. Use 'make sim' first."
 
+docker-shell:
+	@docker compose exec ros2 bash -lc "source /opt/ros/humble/setup.bash && source /home/ros/ros2_ws/install/setup.bash && exec bash"
+
 # =============================================================================
 # Neural Services Management (group-based)
 # =============================================================================
@@ -250,7 +253,7 @@ neural-infer: sync-policies
 	fi; \
 	echo ">>> Syncing src to container..."; \
 	docker cp src/. "$$CONTAINER":/home/ros/ros2_ws/src/; \
-	docker exec -i -u ros "$$CONTAINER" /bin/bash -lc "source /opt/ros/humble/setup.bash && cd /home/ros/ros2_ws && source install/setup.bash && PYTHONPATH=/home/ros/ros2_ws/src:\$$PYTHONPATH python3 src/neural_manager/neural_inference/neural_infer.py"
+	docker exec -i -u ros "$$CONTAINER" /bin/bash -lc "source /opt/ros/humble/setup.bash && cd /home/ros/ros2_ws && source install/setup.bash && PYTHONPATH=/home/ros/ros2_ws/src:\$$PYTHONPATH python3 -m neural_manager.neural_inference.neural_infer"
 
 logs:
 	@echo ">>> Streaming all service logs (press Ctrl+C to exit)..."
