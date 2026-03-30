@@ -25,9 +25,10 @@ from omegaconf.omegaconf import DictConfig
 from neural_manager.neural_inference.control.action_post_processor import ActionPostProcessor
 from neural_manager.neural_inference.features import RevisionContext, VtolFeatureProvider
 from neural_manager.neural_inference.inference.actors import MLPPolicyActor
+from neural_manager.neural_inference.logging import InferenceLogger
 from px4_msgs.msg import VehicleAccRatesSetpoint
 
-ARTIFACTS_ROOT = Path("/home/ros/policies")
+ARTIFACTS_ROOT = Path("/home/ros")
 DEFAULT_TASK = "vtol_hover"
 
 
@@ -72,6 +73,14 @@ class NeuralControlNode(rclpy.node.Node):
       10,
     )
 
+    log_interval = getattr(self.cfg.debug, "log_interval", 100)
+    self._inference_logger = InferenceLogger(
+      logger=self.get_logger(),
+      log_interval=log_interval,
+      enable_raw_input=True,
+      enable_output=True,
+    )
+
     self._last_action = np.zeros(4, dtype=np.float32)
     self._step_count = 0
 
@@ -110,11 +119,28 @@ class NeuralControlNode(rclpy.node.Node):
     """Run neural inference and publish control command."""
     self._feature_provider.update_last_action(self._last_action)
 
+    raw_input = self._feature_provider.get_raw_input()
+    self._inference_logger.log_raw_input(
+      position_ned=raw_input["position_ned"],
+      velocity_ned=raw_input["velocity_ned"],
+      quat=raw_input["quat"],
+      ang_vel_frd=raw_input["ang_vel_frd"],
+      target_pos_ned=raw_input["target_pos_ned"],
+      last_action=raw_input["last_action"],
+    )
+
     obs = self._feature_provider.get_all_features()
 
     raw_action = self._policy_actor(obs)
 
     control_msg = self._action_processor.process_action(raw_action)
+
+    output = self._action_processor.get_last_output()
+    self._inference_logger.log_output(
+      raw_action=raw_action,
+      thrust_acc=output["thrust_acc"],
+      rate_frd=output["rate_frd"],
+    )
 
     self._control_pub.publish(control_msg)
 

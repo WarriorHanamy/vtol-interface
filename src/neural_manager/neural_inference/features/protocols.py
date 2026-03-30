@@ -12,7 +12,9 @@ This module defines protocols for component interfaces.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, Protocol
+from typing import Any, Protocol, Union
+
+from rclpy.qos import QoSProfile
 
 
 class InferenceNodeProtocol(Protocol):
@@ -28,7 +30,7 @@ class InferenceNodeProtocol(Protocol):
     msg_type: Any,
     topic: str,
     callback: Callable[[Any], None],
-    qos_profile: int,
+    qos_profile: int | QoSProfile,
   ) -> Any:
     """Create a ROS2 subscription."""
     ...

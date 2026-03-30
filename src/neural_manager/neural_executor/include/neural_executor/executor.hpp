@@ -4,8 +4,10 @@
 #include <px4_ros2/common/context.hpp>
 #include <px4_ros2/vehicle_state/vehicle_status.hpp>
 #include <px4_ros2/components/manual_control_input.hpp>
+#include <px4_ros2/odometry/local_position.hpp>
 #include <px4_msgs/msg/vehicle_status.hpp>
 #include <px4_msgs/msg/vehicle_acc_rates_setpoint.hpp>
+#include <px4_msgs/msg/trajectory_setpoint.hpp>
 #include <neural_executor/mavlink_logger.hpp>
 
 #include <chrono>
@@ -57,6 +59,9 @@ public:
         });
 
     _mavlink_logger = std::make_unique<neural_executor::MavlinkLogger>(node());
+
+    _odometry_position = std::make_unique<px4_ros2::OdometryLocalPosition>(*_context);
+    _target_pub = node().create_publisher<px4_msgs::msg::TrajectorySetpoint>("/neural/target", 10);
   }
 
   void onActivate() override
@@ -70,6 +75,7 @@ public:
   {
     RCLCPP_WARN(node().get_logger(), "NeuralExecutor: Deactivated");
     _mavlink_logger->warning("[Neural] Executor deactivated");
+    stopTargetPublishing();
   }
 
   void runState(State state, px4_ros2::Result previous_result)
@@ -104,20 +110,24 @@ public:
           break;
         }
 
+        startTargetPublishing();
+
         if (_vehicle_status->navState() != POSCTL_NAV_STATE) {
           RCLCPP_INFO(node().get_logger(), "State: Position - switching to Position mode");
           _mavlink_logger->info("[Neural] Switching to Position mode");
           scheduleMode(px4_ros2::ModeBase::kModeIDPosctl, [this](px4_ros2::Result pos_result) {
             handlePositionSwitchResult(pos_result);
           });
+        } else {
+          RCLCPP_INFO(node().get_logger(), "State: Position - waiting for RC trigger");
+          _mavlink_logger->notice("[Neural] Ready - waiting RC trigger");
         }
-        RCLCPP_INFO(node().get_logger(), "State: Position - waiting for RC trigger");
-        _mavlink_logger->notice("[Neural] Ready - waiting RC trigger");
         break;
 
       case State::NeuralCtrl:
         RCLCPP_INFO(node().get_logger(), "State: NeuralCtrl");
         _mavlink_logger->info("[Neural] Entering NeuralCtrl mode");
+        stopTargetPublishing();
         scheduleMode(_neural_mode.id(), [this](px4_ros2::Result result) {
           if (result == px4_ros2::Result::Success) {
             RCLCPP_INFO(node().get_logger(), "NeuralCtrl succeeded - continuing in NeuralCtrl mode");
@@ -187,6 +197,10 @@ private:
   rclcpp::Time _last_neural_control_time;
 
   std::unique_ptr<neural_executor::MavlinkLogger> _mavlink_logger;
+
+  std::unique_ptr<px4_ros2::OdometryLocalPosition> _odometry_position;
+  rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr _target_pub;
+  rclcpp::TimerBase::SharedPtr _target_publish_timer;
 
   bool _waiting_for_neural_control{false};
   rclcpp::Time _neural_wait_start_time;
@@ -270,6 +284,50 @@ private:
 
     _aux1_high_last = aux1_high;
     _button_pressed_last = button_pressed;
+  }
+
+  void publishCurrentPositionAsTarget()
+  {
+    if (!_odometry_position->positionXYValid() || !_odometry_position->positionZValid()) {
+      RCLCPP_WARN_THROTTLE(node().get_logger(), *node().get_clock(), 2000,
+                           "Position not valid, cannot publish target");
+      return;
+    }
+
+    auto pos = _odometry_position->positionNed();
+    px4_msgs::msg::TrajectorySetpoint msg;
+    msg.timestamp = node().get_clock()->now().nanoseconds() / 1000;
+    msg.position[0] = pos.x();
+    msg.position[1] = pos.y();
+    msg.position[2] = pos.z();
+    msg.velocity[0] = NAN;
+    msg.velocity[1] = NAN;
+    msg.velocity[2] = NAN;
+    msg.acceleration[0] = NAN;
+    msg.acceleration[1] = NAN;
+    msg.acceleration[2] = NAN;
+
+    _target_pub->publish(msg);
+  }
+
+  void startTargetPublishing()
+  {
+    if (_target_publish_timer) return;
+
+    _target_publish_timer = node().create_wall_timer(
+      std::chrono::milliseconds(20),
+      [this]() { publishCurrentPositionAsTarget(); }
+    );
+
+    RCLCPP_INFO(node().get_logger(), "Started publishing target position at 50Hz");
+  }
+
+  void stopTargetPublishing()
+  {
+    if (_target_publish_timer) {
+      _target_publish_timer->cancel();
+      _target_publish_timer = nullptr;
+    }
   }
 
   void handlePositionSwitchResult(px4_ros2::Result result)

@@ -81,6 +81,8 @@ class ActionPostProcessor:
     self._action_limits = action_limits
 
     self._last_action = np.zeros(4, dtype=np.float32)
+    self._last_thrust_acc = 0.0
+    self._last_rate_frd = np.zeros(3, dtype=np.float32)
     self._control_command_count = 0
 
     if self._logger:
@@ -147,7 +149,17 @@ class ActionPostProcessor:
     msg.rates_sp[1] = float(rate_frd[1])
     msg.rates_sp[2] = float(rate_frd[2])
 
+    self._last_thrust_acc = float(thrust_acc)
+    self._last_rate_frd = rate_frd.copy()
+
     msg.sol_time = -1.0
+
+    if self._print_control_commands:
+      direction = "↑ UP" if thrust_acc < 0 else ("↓ DOWN" if thrust_acc > 0 else "— ZERO")
+      self._logger.info(
+        f"VehicleAccRatesSetpoint: thrust_axis_acc_sp={thrust_acc:+.3f} m/s² ({direction}), "
+        f"rates_sp=[{rate_frd[0]:+.3f}, {rate_frd[1]:+.3f}, {rate_frd[2]:+.3f}] rad/s (FRD)"
+      )
 
     return msg
 
@@ -186,19 +198,21 @@ class ActionPostProcessor:
     """
     Convert normalized thrust to acceleration in m/s^2.
 
+    PX4 thrust_axis_acc_sp convention: down is positive, up is negative.
+    - thrust_raw = -1 → thrust_acc = -max_acc (max upward)
+    - thrust_raw =  0 → thrust_acc = 0
+    - thrust_raw = +1 → thrust_acc = +max_acc (max downward)
+
     Args:
         thrust_raw: Normalized thrust value [-1, 1] (after tanh activation)
 
     Returns:
-        Thrust acceleration in m/s^2
+        Thrust acceleration in m/s^2 (down positive, up negative)
     """
     if self._acc_fixed:
       return float(self._max_acc / 2.0)
 
-    thrust_frac = (thrust_raw + 1.0) / 2.0
-    thrust_frac = np.clip(thrust_frac, 0.0, 1.0)
-
-    thrust_acc = thrust_frac * self._max_acc
+    thrust_acc = thrust_raw * self._max_acc
 
     return float(thrust_acc)
 
@@ -226,6 +240,20 @@ class ActionPostProcessor:
         Last action array [thrust, roll_rate, pitch_rate, yaw_rate]
     """
     return self._last_action.copy()
+
+  def get_last_output(self) -> dict:
+    """
+    Get the last output values for logging.
+
+    Returns:
+        Dictionary containing:
+        - thrust_acc: Thrust acceleration in m/s^2
+        - rate_frd: Angular rates in FRD frame [roll, pitch, yaw] rad/s
+    """
+    return {
+      "thrust_acc": self._last_thrust_acc,
+      "rate_frd": self._last_rate_frd.copy(),
+    }
 
   def convert_action_for_display(self, raw_action: np.ndarray) -> dict:
     """
@@ -348,4 +376,6 @@ class ActionPostProcessor:
   def reset(self):
     """Reset processor state for fresh start."""
     self._last_action = np.zeros(4, dtype=np.float32)
+    self._last_thrust_acc = 0.0
+    self._last_rate_frd = np.zeros(3, dtype=np.float32)
     self._control_command_count = 0

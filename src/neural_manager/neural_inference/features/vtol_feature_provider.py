@@ -16,6 +16,7 @@ import math
 from pathlib import Path
 
 import numpy as np
+from rclpy.qos import qos_profile_sensor_data
 
 from px4_msgs.msg import TrajectorySetpoint, VehicleOdometry
 
@@ -79,14 +80,14 @@ class VtolFeatureProvider(FeatureProviderBase):
           VehicleOdometry,
           odometry_topic,
           self._on_odometry,
-          10,
+          qos_profile_sensor_data,
         )
       if target_topic:
         self._target_sub = node.create_subscription(
           TrajectorySetpoint,
           target_topic,
           self._on_target,
-          10,
+          qos_profile_sensor_data,
         )
 
   def _on_odometry(self, msg: VehicleOdometry) -> None:
@@ -219,6 +220,28 @@ class VtolFeatureProvider(FeatureProviderBase):
         4D numpy array [thrust, roll_rate, pitch_rate, yaw_rate]
     """
     return self._last_action
+
+  def get_raw_input(self) -> dict:
+    """
+    Get raw sensor data before feature transformation.
+
+    Returns:
+        Dictionary containing raw sensor data for logging:
+        - position_ned: Position in NED frame
+        - velocity_ned: Velocity in NED frame
+        - quat: Orientation quaternion [w, x, y, z]
+        - ang_vel_frd: Angular velocity in FRD frame
+        - target_pos_ned: Target position in NED frame
+        - last_action: Last action vector
+    """
+    return {
+      "position_ned": self._position_ned.copy(),
+      "velocity_ned": self._velocity_ned.copy(),
+      "quat": self._quat.copy(),
+      "ang_vel_frd": self._ang_vel_frd.copy(),
+      "target_pos_ned": self._target_pos_ned.copy(),
+      "last_action": self._last_action.copy(),
+    }
 
   def _ensure_float32(self, arr: np.ndarray) -> np.ndarray:
     """
