@@ -4,7 +4,7 @@
  ****************************************************************************/
 /**
  * @file test_neural_manual_mode.hpp
- * @brief Manual flight mode with RC control and exit detection via aux1/button
+ * @brief Manual flight mode with RC control
  * @author steven cheng
  * @date created on 2025.03.20
  */
@@ -20,10 +20,10 @@
 
 /**
  * @class TestNeuralManualMode
- * @brief Manual flight mode with RC control and exit detection
+ * @brief Manual flight mode with RC control
  *
  * This mode converts RC stick inputs into acceleration and rate setpoints.
- * Exit conditions: aux1 falling edge or button released
+ * Deactivation is handled externally by the executor.
  *
  * Coordinate Frames:
  * - World Frame: NED (North-East-Down)
@@ -34,11 +34,8 @@
  * - Input: ManualControlInput (roll, pitch, yaw, throttle sticks)
  * - Output: AccRatesSetpoint (thrust acceleration + body rates)
  * - Yaw Control: Rate-based (direct stick input)
- * - Exit: aux1 falling edge OR button released
  */
 class TestNeuralManualMode : public px4_ros2::ModeBase {
-  static constexpr uint16_t RC_NN_CMD_MASK = 1024;
-
 public:
   explicit TestNeuralManualMode(rclcpp::Node &node)
       : ModeBase(node, Settings{"TestNeuralManual"}) {
@@ -66,8 +63,6 @@ public:
 
 protected:
   void onActivate() override {
-    _aux1_high_last = true;
-    _button_pressed_last = true;
     RCLCPP_INFO(_node.get_logger(), "TestNeuralManualMode activated");
   }
 
@@ -80,12 +75,6 @@ protected:
       RCLCPP_WARN_THROTTLE(
           _node.get_logger(), *_node.get_clock(), 1000,
           "TestNeuralManual: Waiting for valid manual control input...");
-      return;
-    }
-
-    if (detectExitCondition()) {
-      RCLCPP_INFO(_node.get_logger(), "TestNeuralManual: Exit triggered by RC");
-      completed(px4_ros2::Result::ModeFailureOther);
       return;
     }
 
@@ -129,22 +118,6 @@ private:
   std::shared_ptr<px4_ros2::OdometryAttitude> _attitude;
   std::shared_ptr<px4_ros2::AccRatesSetpointType> _acc_rates_setpoint;
   Config _config;
-
-  bool _aux1_high_last{true};
-  bool _button_pressed_last{true};
-
-  bool detectExitCondition() {
-    bool aux1_high = _manual_control_input->aux1() > 0.5f;
-    bool button_pressed = _manual_control_input->buttons() == RC_NN_CMD_MASK;
-
-    bool aux1_falling = !aux1_high && _aux1_high_last;
-    bool button_released = !button_pressed && _button_pressed_last;
-
-    _aux1_high_last = aux1_high;
-    _button_pressed_last = button_pressed;
-
-    return aux1_falling || button_released;
-  }
 
   void loadConfigFromYaml() {
     _config = Config{};
