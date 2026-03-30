@@ -14,6 +14,7 @@ using namespace std::chrono_literals;
 
 class NeuralExecutor : public px4_ros2::ModeExecutorBase
 {
+  static constexpr uint16_t RC_ARM_DISARM_MASK = 512;
   static constexpr uint16_t RC_NN_CMD_MASK = 1024;
   static constexpr uint8_t POSCTL_NAV_STATE = px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_POSCTL;
   static constexpr double STILL_WAIT_TIME_S = 3.0;
@@ -173,6 +174,7 @@ private:
 
   bool _aux1_high_last{false};
   bool _button_pressed_last{false};
+  bool _arm_disarm_pressed_last{false};
 
   rclcpp::Subscription<px4_msgs::msg::VehicleAccRatesSetpoint>::SharedPtr _neural_control_sub;
   bool _neural_control_received{false};
@@ -193,8 +195,35 @@ private:
   void handleRCInput()
   {
     if (!_vehicle_status->lastValid()) return;
-    if (_vehicle_status->navState() != POSCTL_NAV_STATE) return;
     if (!_manual_control_input->isValid()) return;
+
+    bool arm_disarm_pressed = _manual_control_input->buttons() == RC_ARM_DISARM_MASK;
+    bool arm_disarm_rising = arm_disarm_pressed && !_arm_disarm_pressed_last;
+
+    if (arm_disarm_rising) {
+      if (isArmed()) {
+        RCLCPP_INFO(node().get_logger(), "Disarming via button=512");
+        _mavlink_logger->info("[Neural] Disarming via button");
+        disarm([this](px4_ros2::Result result) {
+          if (result != px4_ros2::Result::Success) {
+            RCLCPP_ERROR(node().get_logger(), "Disarm failed: %s", resultToString(result));
+            _mavlink_logger->error("[Neural] Disarm failed");
+          }
+        });
+      } else {
+        RCLCPP_INFO(node().get_logger(), "Arming via button=512");
+        _mavlink_logger->info("[Neural] Arming via button");
+        arm([this](px4_ros2::Result result) {
+          if (result != px4_ros2::Result::Success) {
+            RCLCPP_ERROR(node().get_logger(), "Arm failed: %s", resultToString(result));
+            _mavlink_logger->error("[Neural] Arm failed");
+          }
+        });
+      }
+    }
+    _arm_disarm_pressed_last = arm_disarm_pressed;
+
+    if (_vehicle_status->navState() != POSCTL_NAV_STATE) return;
 
     if (_waiting_for_neural_control) {
       auto elapsed = (node().get_clock()->now() - _neural_wait_start_time).seconds();

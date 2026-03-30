@@ -17,8 +17,8 @@ import time
 import numpy as np
 import rclpy.node
 from geometry_msgs.msg import Vector3Stamped
-from neural_manager.neural_inference.math_utils import frd_flu_rotate
 
+from neural_manager.neural_inference.math_utils import frd_flu_rotate
 from px4_msgs.msg import VehicleAccRatesSetpoint
 
 

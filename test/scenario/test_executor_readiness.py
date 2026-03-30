@@ -31,7 +31,10 @@ class TestExecutorReadinessChecker:
     # Mock subprocess to return other logs but not subscription message
     mock_result = MagicMock()
     mock_result.returncode = 0
-    mock_result.stdout = '{"MESSAGE": "Starting neural executor", "SERVICE": "neural_executor"}\n{"MESSAGE": "Some other log", "SERVICE": "neural_executor"}\n'
+    mock_result.stdout = (
+      '{"MESSAGE": "Starting neural executor", "SERVICE": "neural_executor"}\n'
+      '{"MESSAGE": "Some other log", "SERVICE": "neural_executor"}\n'
+    )
 
     monkeypatch.setattr("subprocess.run", MagicMock(return_value=mock_result))
 
