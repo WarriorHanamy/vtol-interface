@@ -15,7 +15,7 @@ RUN useradd -M -d /home/px4 -s /bin/bash px4 \
     && install -d -o px4 -g px4 /home/px4 /home/px4/.cache /home/px4/.cache/ccache \
     && echo "px4 ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/px4 \
     && chmod 0440 /etc/sudoers.d/px4
-RUN git clone --branch "${PX4_GIT_REF}" --depth 1 "${PX4_GIT_URL}" /home/px4/PX4-Neupilot --recursive
+RUN git clone --depth 1 "${PX4_GIT_URL}" /home/px4/PX4-Neupilot --recursive
 
 WORKDIR /home/px4/PX4-Neupilot
 RUN bash install-dds-agent.bash
