@@ -4,17 +4,19 @@
  ****************************************************************************/
 #pragma once
 
+#include <Eigen/Core>
+#include <px4_msgs/msg/vehicle_thrust_acc_setpoint.hpp>
 #include <px4_ros2/components/mode.hpp>
 #include <px4_ros2/control/setpoint_types/experimental/acc_rates.hpp>
 #include <px4_ros2/odometry/attitude.hpp>
-#include <px4_msgs/msg/vehicle_thrust_acc_setpoint.hpp>
+#include <px4_ros2/utils/geometry.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <yaml-cpp/yaml.h>
-#include <Eigen/Core>
 
 /**
  * @class NeuralManualMode
- * @brief Manual flight mode with tilt-prioritizing attitude control and configurable parameters
+ * @brief Manual flight mode with tilt-prioritizing attitude control and
+ * configurable parameters
  *
  * This mode converts RC stick inputs into acceleration and rate setpoints using
  * a tilt-prioritizing attitude control algorithm.
@@ -29,95 +31,102 @@
  * - Output: AccRatesSetpoint (thrust acceleration + body rates)
  * - Yaw Control: Rate-based (direct stick input)
  */
-class NeuralManualMode : public px4_ros2::ModeBase
-{
+class NeuralManualMode : public px4_ros2::ModeBase {
 public:
-  explicit NeuralManualMode(rclcpp::Node & node)
-      : ModeBase(node, Settings{"NeuralManual"})
-  {
+  explicit NeuralManualMode(rclcpp::Node &node)
+      : ModeBase(node, Settings{"NeuralManual"}) {
     loadConfigFromYaml();
 
-    _manual_control_input = std::make_shared<px4_ros2::ManualControlInput>(*this);
+    _manual_control_input =
+        std::make_shared<px4_ros2::ManualControlInput>(*this);
     _attitude = std::make_shared<px4_ros2::OdometryAttitude>(*this);
-    _acc_rates_setpoint = std::make_shared<px4_ros2::AccRatesSetpointType>(*this);
+    _acc_rates_setpoint =
+        std::make_shared<px4_ros2::AccRatesSetpointType>(*this);
 
     RCLCPP_INFO(_node.get_logger(),
-      "NeuralManualMode initialized: max_tilt=%.1f deg, max_acc=%.1f m/s^2, max_yaw_rate=%.1f rad/s",
-      radToDeg(_config.max_tilt_angle), _config.max_acc, _config.max_yaw_rate);
+                "NeuralManualMode initialized: max_tilt=%.1f deg, max_acc=%.1f "
+                "m/s^2, max_yaw_rate=%.1f rad/s",
+                radToDeg(_config.max_tilt_angle), _config.max_acc,
+                _config.max_yaw_rate);
   }
 
   ~NeuralManualMode() override = default;
 
   // Disable copy, enable move for efficiency
-  NeuralManualMode(const NeuralManualMode&) = delete;
-  NeuralManualMode& operator=(const NeuralManualMode&) = delete;
-  NeuralManualMode(NeuralManualMode&&) noexcept = default;
-  NeuralManualMode& operator=(NeuralManualMode&&) noexcept = default;
+  NeuralManualMode(const NeuralManualMode &) = delete;
+  NeuralManualMode &operator=(const NeuralManualMode &) = delete;
+  NeuralManualMode(NeuralManualMode &&) noexcept = default;
+  NeuralManualMode &operator=(NeuralManualMode &&) noexcept = default;
 
 protected:
-  void onActivate() override
-  {
+  void onActivate() override {
     RCLCPP_INFO(_node.get_logger(), "NeuralManualMode activated");
   }
 
-  void onDeactivate() override
-  {
+  void onDeactivate() override {
     RCLCPP_INFO(_node.get_logger(), "NeuralManualMode deactivated");
   }
 
-  void updateSetpoint(float dt_s) override
-  {
+  void updateSetpoint(float dt_s) override {
     // Check if manual control is valid
     if (!_manual_control_input->isValid()) {
-      RCLCPP_WARN_THROTTLE(_node.get_logger(), *_node.get_clock(), 1000,
-        "NeuralManual: Waiting for valid manual control input...");
+      RCLCPP_WARN_THROTTLE(
+          _node.get_logger(), *_node.get_clock(), 1000,
+          "NeuralManual: Waiting for valid manual control input...");
       return;
     }
 
     // Check if attitude is valid
     if (!_attitude->lastValid(500ms)) {
       RCLCPP_WARN_THROTTLE(_node.get_logger(), *_node.get_clock(), 1000,
-        "NeuralManual: Waiting for attitude data...");
+                           "NeuralManual: Waiting for attitude data...");
       return;
     }
 
     // Read stick inputs
-    const float stick_roll = _manual_control_input->roll();     // [-1, 1], right positive
-    const float stick_pitch = _manual_control_input->pitch();    // [-1, 1], forward negative
-    const float stick_yaw = _manual_control_input->yaw();       // [-1, 1], clockwise positive
-    const float stick_throttle = _manual_control_input->throttle(); // [-1, 1], up positive
+    const float stick_roll =
+        _manual_control_input->roll(); // [-1, 1], right positive
+    const float stick_pitch =
+        _manual_control_input->pitch(); // [-1, 1], forward negative
+    const float stick_yaw =
+        _manual_control_input->yaw(); // [-1, 1], clockwise positive
+    const float stick_throttle =
+        _manual_control_input->throttle(); // [-1, 1], up positive
 
-    // Get current attitude
     const Eigen::Quaternionf q_current = _attitude->attitude();
+    const float current_yaw = px4_ros2::quaternionToYaw(q_current);
 
-    // Step 1: Generate tilt setpoint from roll/pitch sticks
-    const Eigen::Quaternionf q_tilt = generateTiltSetpoint(stick_roll, stick_pitch);
+    const float roll_deadzoned =
+        applyDeadzone(stick_roll, _config.stick_deadzone);
+    const float pitch_deadzoned =
+        applyDeadzone(stick_pitch, _config.stick_deadzone);
 
-    // Step 2: Compute acceleration setpoint from throttle
+    const Eigen::Quaternionf q_target =
+        generateTargetAttitude(roll_deadzoned, pitch_deadzoned, current_yaw);
     const float acc_sp = computeAccSetpoint(stick_throttle);
-
-    // Step 3: Compute rate setpoint with tilt-prioritizing control
-    const Eigen::Vector3f rates_sp = computeRateSetpoint(q_current, q_tilt, stick_yaw);
+    const Eigen::Vector3f rates_sp =
+        computeRateSetpoint(q_current, q_target, stick_yaw);
 
     // Apply setpoint
     _acc_rates_setpoint->update(acc_sp, rates_sp);
 
     // Debug logging (throttled)
     RCLCPP_DEBUG_THROTTLE(_node.get_logger(), *_node.get_clock(), 500,
-      "NeuralManual: sticks[%.2f,%.2f,%.2f,%.2f] -> acc=%.2f, rates[%.2f,%.2f,%.2f]",
-      stick_roll, stick_pitch, stick_yaw, stick_throttle,
-      acc_sp, rates_sp[0], rates_sp[1], rates_sp[2]);
+                          "NeuralManual: sticks[%.2f,%.2f,%.2f,%.2f] -> "
+                          "acc=%.2f, rates[%.2f,%.2f,%.2f]",
+                          stick_roll, stick_pitch, stick_yaw, stick_throttle,
+                          acc_sp, rates_sp[0], rates_sp[1], rates_sp[2]);
   }
 
 private:
   // Configuration parameters
-  struct Config
-  {
-    float max_tilt_angle{0.785f};
+  struct Config {
+    float max_tilt_angle{0.524f};
     float max_acc{19.6f};
     Eigen::Vector3f p_gains{5.0f, 5.0f, 3.0f};
     float max_rate{3.0f};
     float max_yaw_rate{1.0f};
+    float stick_deadzone{0.1f};
   };
 
   // Member variables
@@ -130,14 +139,14 @@ private:
   // Configuration Loading
   // ========================================================================
 
-  void loadConfigFromYaml()
-  {
+  void loadConfigFromYaml() {
     // Default configuration
     _config = Config{};
 
     // Try to load from config file
     std::string config_file;
-    if (_node.get_parameter("config_file", config_file) && !config_file.empty()) {
+    if (_node.get_parameter("config_file", config_file) &&
+        !config_file.empty()) {
       try {
         YAML::Node config = YAML::LoadFile(config_file);
 
@@ -147,7 +156,8 @@ private:
           if (node["max_tilt_angle"]) {
             _config.max_tilt_angle = node["max_tilt_angle"].as<float>();
             // Convert degrees to radians if needed
-            if (_config.max_tilt_angle > 2.0f) { // Heuristic: > 114 deg means input is in degrees
+            if (_config.max_tilt_angle >
+                2.0f) { // Heuristic: > 114 deg means input is in degrees
               _config.max_tilt_angle = degToRad(_config.max_tilt_angle);
             }
           }
@@ -159,11 +169,9 @@ private:
           if (node["p_gains"]) {
             auto gains = node["p_gains"];
             if (gains.size() == 3) {
-              _config.p_gains = Eigen::Vector3f{
-                gains[0].as<float>(),
-                gains[1].as<float>(),
-                gains[2].as<float>()
-              };
+              _config.p_gains =
+                  Eigen::Vector3f{gains[0].as<float>(), gains[1].as<float>(),
+                                  gains[2].as<float>()};
             }
           }
 
@@ -176,19 +184,22 @@ private:
           }
 
           RCLCPP_INFO(_node.get_logger(),
-            "Loaded neural_manual config from: %s", config_file.c_str());
+                      "Loaded neural_manual config from: %s",
+                      config_file.c_str());
         } else {
-          RCLCPP_WARN(_node.get_logger(),
-            "No neural_manual section found in config file, using defaults");
+          RCLCPP_WARN(
+              _node.get_logger(),
+              "No neural_manual section found in config file, using defaults");
         }
-      } catch (const YAML::Exception& e) {
+      } catch (const YAML::Exception &e) {
         RCLCPP_ERROR(_node.get_logger(),
-          "Failed to load config file '%s': %s. Using defaults.",
-          config_file.c_str(), e.what());
+                     "Failed to load config file '%s': %s. Using defaults.",
+                     config_file.c_str(), e.what());
       }
     } else {
-      RCLCPP_WARN(_node.get_logger(),
-        "No config_file parameter found, using default configuration");
+      RCLCPP_WARN(
+          _node.get_logger(),
+          "No config_file parameter found, using default configuration");
     }
 
     // Validate and clamp configuration
@@ -197,40 +208,40 @@ private:
     _config.p_gains = _config.p_gains.cwiseMax(0.1f).cwiseMin(20.0f);
     _config.max_rate = std::clamp(_config.max_rate, 0.5f, 10.0f);
     _config.max_yaw_rate = std::clamp(_config.max_yaw_rate, 0.1f, 5.0f);
+    _config.stick_deadzone = std::clamp(_config.stick_deadzone, 0.0f, 0.1f);
   }
 
   // ========================================================================
   // Core Control Algorithms
   // ========================================================================
 
+  static float applyDeadzone(float value, float deadzone) {
+    if (std::abs(value) < deadzone) {
+      return 0.0f;
+    }
+    const float sign = (value > 0.0f) ? 1.0f : -1.0f;
+    return sign * (std::abs(value) - deadzone) / (1.0f - deadzone);
+  }
+
   /**
-   * @brief Generate tilt setpoint quaternion from roll/pitch stick inputs
+   * @brief Generate target attitude quaternion from stick inputs with current
+   * yaw preserved
    *
-   * Input: stick_roll, stick_pitch in [-1, 1]
-   * Output: Quaternion representing the desired tilt
+   * Input: stick_roll, stick_pitch in [-1, 1], current_yaw in radians
+   * Output: Quaternion representing the desired attitude (tilt + current yaw)
    *
    * Coordinate Frame: FRD (Forward-Right-Down)
    * - Roll stick right (+) → positive rotation around X (right side down)
    * - Pitch stick forward (+) → negative rotation around Y (nose down)
-   *
-   * The negative sign on pitch is CRITICAL for correct behavior in NED frame.
+   * - Yaw is preserved from current attitude
    */
-  Eigen::Quaternionf generateTiltSetpoint(float stick_roll, float stick_pitch) const
-  {
-    // Build tilt vector in FRD frame
-    Eigen::Vector3f tilt_vector;
-    tilt_vector.x() = stick_roll * _config.max_tilt_angle;     // Right positive
-    tilt_vector.y() = -stick_pitch * _config.max_tilt_angle;   // Forward negative (nose down)
-    tilt_vector.z() = 0.0f;  // No tilt around Z axis
+  Eigen::Quaternionf generateTargetAttitude(float stick_roll, float stick_pitch,
+                                            float current_yaw) const {
+    const float target_roll = stick_roll * _config.max_tilt_angle;
+    const float target_pitch = -stick_pitch * _config.max_tilt_angle;
 
-    // Limit magnitude to max_tilt_angle
-    const float tilt_magnitude = tilt_vector.norm();
-    if (tilt_magnitude > _config.max_tilt_angle) {
-      tilt_vector = tilt_vector / tilt_magnitude * _config.max_tilt_angle;
-    }
-
-    // Create quaternion from rotation vector (axis-angle representation)
-    return axisAngleToQuaternion(tilt_vector);
+    return px4_ros2::eulerRpyToQuaternion(target_roll, target_pitch,
+                                          current_yaw);
   }
 
   /**
@@ -246,24 +257,18 @@ private:
    *
    * Formula: acc = 1g + throttle * (max_acc - 1g)
    */
-  float computeAccSetpoint(float stick_throttle) const
-  {
-    constexpr float gravity = 9.81f;  // m/s^2
+  float computeAccSetpoint(float stick_throttle) const {
+    constexpr float gravity = 9.81f; // m/s^2
     const float acc_sp = gravity + stick_throttle * (_config.max_acc - gravity);
 
     // Ensure minimum thrust (don't fall out of sky)
-    return std::max(acc_sp, 0.5f);  // Minimum 0.5g upward
+    return std::max(acc_sp, 0.5f); // Minimum 0.5g upward
   }
 
-  Eigen::Vector3f computeRateSetpoint(
-    const Eigen::Quaternionf& q_current,
-    const Eigen::Quaternionf& q_target,
-    float stick_yaw) const
-  {
-    const Eigen::Vector3f z_current = extractZAxis(q_current);
-    const Eigen::Vector3f z_target = extractZAxis(q_target);
-    const Eigen::Quaternionf q_tilt_correction = tiltCorrectionQuaternion(z_current, z_target);
-    const Eigen::Quaternionf q_error = q_current.inverse() * (q_tilt_correction * q_current);
+  Eigen::Vector3f computeRateSetpoint(const Eigen::Quaternionf &q_current,
+                                      const Eigen::Quaternionf &q_target,
+                                      float stick_yaw) const {
+    const Eigen::Quaternionf q_error = q_current.inverse() * q_target;
 
     Eigen::Vector3f rate_setpoint;
     rate_setpoint.x() = 2.0f * q_error.x() * _config.p_gains.x();
@@ -275,63 +280,13 @@ private:
       rate_setpoint.y() = -rate_setpoint.y();
     }
 
-    rate_setpoint.x() = std::clamp(rate_setpoint.x(), -_config.max_rate, _config.max_rate);
-    rate_setpoint.y() = std::clamp(rate_setpoint.y(), -_config.max_rate, _config.max_rate);
-    rate_setpoint.z() = std::clamp(rate_setpoint.z(), -_config.max_yaw_rate, _config.max_yaw_rate);
+    rate_setpoint.x() =
+        std::clamp(rate_setpoint.x(), -_config.max_rate, _config.max_rate);
+    rate_setpoint.y() =
+        std::clamp(rate_setpoint.y(), -_config.max_rate, _config.max_rate);
+    rate_setpoint.z() = std::clamp(rate_setpoint.z(), -_config.max_yaw_rate,
+                                   _config.max_yaw_rate);
 
     return rate_setpoint;
-  }
-
-  // ========================================================================
-  // Quaternion Utility Functions
-  // ========================================================================
-
-  /**
-   * @brief Convert axis-angle rotation vector to quaternion
-   *
-   * The input is a rotation vector where the direction is the rotation axis
-   * and the magnitude is the rotation angle (in radians).
-   *
-   * Uses Eigen's AngleAxis for robust conversion.
-   */
-  static Eigen::Quaternionf axisAngleToQuaternion(const Eigen::Vector3f& axis_angle)
-  {
-    const float angle = axis_angle.norm();
-
-    if (angle < 1e-6f) {
-      return Eigen::Quaternionf::Identity();  // Small angle, return identity
-    }
-
-    const Eigen::Vector3f axis = axis_angle / angle;
-    return Eigen::Quaternionf(Eigen::AngleAxisf(angle, axis)).normalized();
-  }
-
-  /**
-   * @brief Extract the Z axis (body-down direction) from a quaternion
-   *
-   * For a quaternion representing the body-to-world rotation,
-   * the Z axis of the body frame in world coordinates is the third column
-   * of the rotation matrix.
-   *
-   * Mathematically: z_world = R * [0, 0, 1]^T = R.col(2)
-   */
-  static Eigen::Vector3f extractZAxis(const Eigen::Quaternionf& q)
-  {
-    // Rotate the Z axis [0, 0, 1] by quaternion q
-    const Eigen::Matrix3f R = q.toRotationMatrix();
-    return R.col(2);  // Third column is the rotated Z axis
-  }
-
-  /**
-   * @brief Compute the rotation quaternion that aligns two vectors
-   *
-   * This computes the shortest arc rotation from z_current to z_target.
-   * Uses Eigen's FromTwoVectors method which is numerically stable.
-   */
-  static Eigen::Quaternionf tiltCorrectionQuaternion(
-    const Eigen::Vector3f& z_current,
-    const Eigen::Vector3f& z_target)
-  {
-    return Eigen::Quaternionf::FromTwoVectors(z_current, z_target).normalized();
   }
 };
