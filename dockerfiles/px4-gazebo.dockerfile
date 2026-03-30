@@ -7,9 +7,7 @@ FROM px4_deps
 LABEL maintainer="WarriorHanamy <rongerch@outlook.com>"
 
 WORKDIR /home/px4
-ARG PX4_GIT_REF=main
-RUN git clone --recursive --branch "${PX4_GIT_REF}" --depth 1 \
-    https://github.com/WarriorHanamy/PX4-Neupilot.git
+COPY deps/PX4-Neupilot /home/px4/PX4-Neupilot
 
 WORKDIR /home/px4/PX4-Neupilot
 RUN bash install-dds-agent.bash

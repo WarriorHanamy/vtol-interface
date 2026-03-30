@@ -13,6 +13,7 @@ docker-ros2-build:
 # =============================================================================
 
 docker-px4-build:
+	@git submodule update --init --recursive $(PX4_SUBMODULE_PATH)
 	@echo ">>> Tagging px4-deps as px4_deps..."
 	@docker tag px4-deps:jammy-harmonic px4_deps:latest
 	@echo ">>> Building px4-gazebo image without cache..."
@@ -26,6 +27,7 @@ docker-px4-build:
 
 VTOL_OFFLOAD_CONTAINER ?= vtol-build-offload
 VTOL_OFFLOAD_IMAGE ?= ros2-vtol:latest
+PX4_SUBMODULE_PATH := deps/PX4-Neupilot
 
 docker-offload-build:
 	@docker rm -f $(VTOL_OFFLOAD_CONTAINER) > /dev/null 2>&1 || true
@@ -99,9 +101,16 @@ docker-build-all:
 MSG_SUBMODULE_PATH := src/px4_msgs/msg
 
 sync-msg-submodule:
-	@echo ">>> Fetching msg submodule info via gh api..."
-	@MSG_COMMIT=$$(gh api repos/WarriorHanamy/PX4-Neupilot/git/trees/main --jq '.tree[] | select(.path=="msg") | .sha'); \
-	MSG_URL=$$(gh api repos/WarriorHanamy/PX4-Neupilot/contents/.gitmodules --jq '.content' | base64 -d | grep -A3 '\[submodule "msg"\]' | grep 'url' | sed 's/.*= *//'); \
+	@echo ">>> Resolving msg submodule info..."; \
+	if [ -d "$(PX4_SUBMODULE_PATH)" ]; then \
+		MSG_COMMIT=$$(git -C "$(PX4_SUBMODULE_PATH)" submodule status -- msg | sed 's/^[-+ ]//' | cut -d' ' -f1); \
+		MSG_URL=$$(git -C "$(PX4_SUBMODULE_PATH)" config -f .gitmodules submodule.msg.url); \
+		echo ">>> Using local PX4 submodule metadata from $(PX4_SUBMODULE_PATH)"; \
+	else \
+		echo ">>> Local PX4 submodule not found, falling back to gh api..."; \
+		MSG_COMMIT=$$(gh api repos/WarriorHanamy/PX4-Neupilot/git/trees/main --jq '.tree[] | select(.path=="msg") | .sha'); \
+		MSG_URL=$$(gh api repos/WarriorHanamy/PX4-Neupilot/contents/.gitmodules --jq '.content' | base64 -d | grep -A3 '\[submodule "msg"\]' | grep 'url' | sed 's/.*= *//'); \
+	fi; \
 	echo ">>> Target commit: $$MSG_COMMIT"; \
 	echo ">>> Target URL: $$MSG_URL"; \
 	echo ">>> Direct checkout to commit..."; \
@@ -201,7 +210,28 @@ neural-status:
 	@echo "=== Test Target (Group B) ==="
 	@systemctl --user status test.target --no-pager || true
 
-neural-infer:
+POLICIES_SRC ?= /home/rec/server/policies
+
+sync-policies:
+	@echo ">>> Copying policies to ros2 container..."
+	@CONTAINER=$$(docker ps --filter "name=ros2" --format "{{.Names}}" | head -n 1); \
+	if [ -z "$$CONTAINER" ]; then \
+		echo "Error: ros2 container not running. Use 'make sim' first."; \
+		exit 1; \
+	fi; \
+	if [ ! -d "$(POLICIES_SRC)" ]; then \
+		echo "Error: Policies directory not found: $(POLICIES_SRC)"; \
+		exit 1; \
+	fi; \
+	echo ">>> Source: $(POLICIES_SRC)"; \
+	docker exec -u root "$$CONTAINER" mkdir -p /home/ros/policies && \
+	if ! docker exec -u root "$$CONTAINER" chown ros:ros /home/ros/policies; then \
+		echo ">>> Skipping chown for /home/ros/policies (read-only mount or restricted FS)"; \
+	fi && \
+	docker cp "$(POLICIES_SRC)/." "$$CONTAINER":/home/ros/policies/ && \
+	echo ">>> Done. Policies copied to /home/ros/policies/"
+
+neural-infer: sync-policies
 	@echo ">>> Running neural_infer in ros2 container..."
 	@CONTAINER=$$(docker ps --filter "name=ros2" --format "{{.Names}}" | head -n 1); \
 	if [ -z "$$CONTAINER" ]; then \
