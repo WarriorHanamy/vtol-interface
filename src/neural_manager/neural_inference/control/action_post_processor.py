@@ -34,8 +34,7 @@ class ActionPostProcessor:
     self,
     min_thrust_g: float = 0.0,
     max_thrust_g: float = 2.0,
-    max_roll_pitch_rate: float = 1.0,
-    max_yaw_rate: float = 1.0,
+    max_ang_vel: tuple[float, float, float] = (3.0, 5.0, 3.0),
     node_logger=None,
     acc_fixed: bool = False,
     use_tanh_activation: bool = False,
@@ -62,8 +61,7 @@ class ActionPostProcessor:
     """
     self._min_thrust_g = float(min_thrust_g)
     self._max_thrust_g = float(max_thrust_g)
-    self._max_roll_pitch_rate = float(max_roll_pitch_rate)
-    self._max_yaw_rate = float(max_yaw_rate)
+    self._max_ang_vel = tuple(max_ang_vel)
     self._logger = node_logger
     self._acc_fixed = acc_fixed
     self._use_tanh_activation = use_tanh_activation
@@ -231,15 +229,18 @@ class ActionPostProcessor:
     Returns:
         Dictionary containing action limit configuration
     """
-    return {
-      "min": self._action_limits["min"],
-      "max": self._action_limits["max"],
-      "min_thrust_g": self._min_thrust_g,
-      "max_thrust_g": self._max_thrust_g,
-      "max_roll_pitch_rate": self._max_roll_pitch_rate,
-      "max_yaw_rate": self._max_yaw_rate,
-      "acc_fixed": self._acc_fixed,
-    }
+        return {
+            "min": self._action_limits["min"],
+            "max": self._action_limits["max"],
+            "min_thrust_g": self._min_thrust_g,
+            "max_thrust_g": self._max_thrust_g,
+            "max_ang_vel": self._max_ang_vel,
+            "acc_fixed": self._acc_fixed,
+            "use_tanh_activation": self._use_tanh_activation,
+            "enable_action_clipping": self._enable_action_clipping,
+            "print_control_commands": self._print_control_commands
+            "ros_node": ros_node,
+        }
 
   def get_last_action(self) -> np.ndarray:
     """

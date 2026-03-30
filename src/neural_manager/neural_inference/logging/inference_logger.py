@@ -140,7 +140,7 @@ class InferenceLogger:
     feature_specs: list,
   ) -> None:
     """
-    Log feature vector components to file.
+    Log feature vector components to file and RCL logger.
 
     Args:
         obs: Full observation vector
@@ -152,23 +152,24 @@ class InferenceLogger:
     if self._step_count % self._log_interval != 0:
       return
 
-    lines = [
-      "=" * 60,
-      f"[FEATURES] Step {self._step_count}",
-      "-" * 50,
-    ]
+    self._logger.info("=" * 60)
+    self._logger.info(f"[FEATURES] Step {self._step_count}")
+    self._logger.info("-" * 50)
 
+    lines = []
     offset = 0
     for spec in feature_specs:
       feat_vec = obs[offset : offset + spec.dim]
       feat_str = ", ".join(f"{v:+.4f}" for v in feat_vec)
-      lines.append(f"  {spec.name}: [{feat_str}] (dim={spec.dim})")
+      line = f"  {spec.name}: [{feat_str}] (dim={spec.dim})"
+      self._logger.info(line)
+      lines.append(line)
       offset += spec.dim
 
-    lines.append("=" * 60)
+    self._logger.info("=" * 60)
 
     with open(self._features_log_file, "a") as f:
-      f.write("\n".join(lines) + "\n")
+      f.write("\n".join(["=" * 60, f"[FEATURES] Step {self._step_count}", "-" * 50] + lines + ["=" * 60]) + "\n")
 
   def set_log_interval(self, interval: int) -> None:
     """Set logging interval."""
