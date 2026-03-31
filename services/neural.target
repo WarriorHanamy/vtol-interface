@@ -1,7 +1,7 @@
 [Unit]
-Description=Neural Services Group A (neural_executor + neural_infer)
+Description=Neural Services Group (neural_executor only)
 Conflicts=test.target
-Wants=neural_executor.service neural_infer.service
+Wants=neural_executor.service
 AllowIsolate=yes
 
 [Install]

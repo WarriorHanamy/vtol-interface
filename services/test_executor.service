@@ -1,6 +1,5 @@
 [Unit]
 Description=Test Executor Service (runs inside ros2 container)
-Documentation=Executes test_neural_executor launch file. Stops automatically if ros2 container exits.
 
 BindsTo=ros2-liveness.service
 After=ros2-liveness.service

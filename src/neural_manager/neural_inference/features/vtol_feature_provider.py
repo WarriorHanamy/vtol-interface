@@ -19,6 +19,7 @@ import numpy as np
 from rclpy.qos import qos_profile_sensor_data
 
 from neural_manager.neural_inference.math_utils import (
+  canonicalize_quat_w_positive,
   frd_flu_rotate,
   ned_quat_frd_to_enu_quat_flu,
   ned_to_frd_rotate,
@@ -235,7 +236,8 @@ class VtolFeatureProvider(FeatureProviderBase):
     Returns:
         4D numpy array [w, x, y, z] quaternion in ENU FLU frame
     """
-    return ned_quat_frd_to_enu_quat_flu(self._ned_quat_frd).astype(np.float32)
+    enu_quat_flu = ned_quat_frd_to_enu_quat_flu(self._ned_quat_frd).astype(np.float32)
+    return canonicalize_quat_w_positive(enu_quat_flu)
 
   def get_last_raw_action(self) -> np.ndarray:
     """

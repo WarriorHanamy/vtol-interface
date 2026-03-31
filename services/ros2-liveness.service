@@ -1,9 +1,7 @@
 [Unit]
 Description=ROS2 Container Liveness Probe
-Documentation=Checks if ros2 container is running. Stops all dependent services if container exits.
 
 After=docker.service sim-session.service
-Requires=docker.service
 PartOf=sim-session.service
 
 [Service]

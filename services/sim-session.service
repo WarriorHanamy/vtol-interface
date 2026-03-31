@@ -1,6 +1,5 @@
 [Unit]
 Description=VTOL Simulation Session (Docker Compose)
-Documentation=Manages px4, qgc, and ros2 containers lifecycle
 
 After=network-online.target docker.service
 Wants=network-online.target
@@ -18,6 +17,14 @@ ExecStart=/bin/sh -c '\
   echo ""; \
   echo "✓ Containers started:"; \
   docker compose ps --format "table {{.Name}}\t{{.Status}}"; \
+  echo ""; \
+  echo "Starting ros2-liveness probe..."; \
+  systemctl --user start ros2-liveness.service && \
+  echo "✓ Liveness probe started"; \
+  echo ""; \
+  echo "Starting neural executor..."; \
+  systemctl --user start neural.target && \
+  echo "✓ Neural executor started"; \
   echo ""; \
   echo "To enter ros2 container: docker compose attach ros2"; \
   echo "To exit container (keep running): Ctrl+P Ctrl+Q"; \
