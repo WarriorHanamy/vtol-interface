@@ -127,11 +127,11 @@ class NeuralControlNode(rclpy.node.Node):
 
     raw_input = self._feature_provider.get_raw_input()
     self._inference_logger.log_raw_input(
-      position_ned=raw_input["position_ned"],
-      velocity_ned=raw_input["velocity_ned"],
-      quat=raw_input["quat"],
-      ang_vel_frd=raw_input["ang_vel_frd"],
-      target_pos_ned=raw_input["target_pos_ned"],
+      ned_position=raw_input["ned_position"],
+      ned_velocity=raw_input["ned_velocity"],
+      ned_quat_frd=raw_input["ned_quat_frd"],
+      frd_ang_vel=raw_input["frd_ang_vel"],
+      ned_target_position=raw_input["ned_target_position"],
       last_action=raw_input["last_action"],
     )
 
@@ -146,7 +146,7 @@ class NeuralControlNode(rclpy.node.Node):
     self._inference_logger.log_output(
       raw_action=raw_action,
       thrust_acc=output["thrust_acc"],
-      rate_frd=output["rate_frd"],
+      frd_ang_vel=output["frd_ang_vel"],
     )
 
     self._control_pub.publish(control_msg)

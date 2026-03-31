@@ -63,22 +63,22 @@ class InferenceLogger:
 
   def log_raw_input(
     self,
-    position_ned: np.ndarray,
-    velocity_ned: np.ndarray,
-    quat: np.ndarray,
-    ang_vel_frd: np.ndarray,
-    target_pos_ned: np.ndarray,
+    ned_position: np.ndarray,
+    ned_velocity: np.ndarray,
+    ned_quat_frd: np.ndarray,
+    frd_ang_vel: np.ndarray,
+    ned_target_position: np.ndarray,
     last_action: np.ndarray,
   ) -> None:
     """
     Log raw sensor data before feature transformation.
 
     Args:
-        position_ned: Position in NED frame [N, E, D] meters
-        velocity_ned: Velocity in NED frame [N, E, D] m/s
-        quat: Orientation quaternion [w, x, y, z]
-        ang_vel_frd: Angular velocity in FRD frame [roll, pitch, yaw] rad/s
-        target_pos_ned: Target position in NED frame [N, E, D] meters
+        ned_position: Position in NED frame [N, E, D] meters
+        ned_velocity: Velocity in NED frame [N, E, D] m/s
+        ned_quat_frd: Orientation quaternion [w, x, y, z]
+        frd_ang_vel: Angular velocity in FRD frame [roll, pitch, yaw] rad/s
+        ned_target_position: Target position in NED frame [N, E, D] meters
         last_action: Last action vector [thrust, roll_rate, pitch_rate, yaw_rate]
     """
     if not self._enable_raw_input:
@@ -91,14 +91,18 @@ class InferenceLogger:
     self._logger.info("=" * 60)
     self._logger.info(f"[RAW INPUT] Step {self._step_count}")
     self._logger.info("-" * 40)
-    self._logger.info(f"  position_ned:    [{position_ned[0]:+.3f}, {position_ned[1]:+.3f}, {position_ned[2]:+.3f}] m")
+    self._logger.info(f"  ned_position:    [{ned_position[0]:+.3f}, {ned_position[1]:+.3f}, {ned_position[2]:+.3f}] m")
     self._logger.info(
-      f"  velocity_ned:    [{velocity_ned[0]:+.3f}, {velocity_ned[1]:+.3f}, {velocity_ned[2]:+.3f}] m/s"
+      f"  ned_velocity:    [{ned_velocity[0]:+.3f}, {ned_velocity[1]:+.3f}, {ned_velocity[2]:+.3f}] m/s"
     )
-    self._logger.info(f"  quat (wxyz):     [{quat[0]:+.4f}, {quat[1]:+.4f}, {quat[2]:+.4f}, {quat[3]:+.4f}]")
-    self._logger.info(f"  ang_vel_frd:     [{ang_vel_frd[0]:+.4f}, {ang_vel_frd[1]:+.4f}, {ang_vel_frd[2]:+.4f}] rad/s")
     self._logger.info(
-      f"  target_pos_ned:  [{target_pos_ned[0]:+.3f}, {target_pos_ned[1]:+.3f}, {target_pos_ned[2]:+.3f}] m"
+      "  ned_quat_frd:    "
+      f"[{ned_quat_frd[0]:+.4f}, {ned_quat_frd[1]:+.4f}, {ned_quat_frd[2]:+.4f}, {ned_quat_frd[3]:+.4f}]"
+    )
+    self._logger.info(f"  frd_ang_vel:     [{frd_ang_vel[0]:+.4f}, {frd_ang_vel[1]:+.4f}, {frd_ang_vel[2]:+.4f}] rad/s")
+    self._logger.info(
+      "  ned_target_position:  "
+      f"[{ned_target_position[0]:+.3f}, {ned_target_position[1]:+.3f}, {ned_target_position[2]:+.3f}] m"
     )
     self._logger.info(
       f"  last_action:     [{last_action[0]:+.4f}, {last_action[1]:+.4f}, {last_action[2]:+.4f}, {last_action[3]:+.4f}]"
@@ -109,7 +113,7 @@ class InferenceLogger:
     self,
     raw_action: np.ndarray,
     thrust_acc: float,
-    rate_frd: np.ndarray,
+    frd_ang_vel: np.ndarray,
   ) -> None:
     """
     Log output results after inference.
@@ -117,7 +121,7 @@ class InferenceLogger:
     Args:
         raw_action: Raw action from neural network [thrust, roll_rate, pitch_rate, yaw_rate]
         thrust_acc: Processed thrust acceleration in m/s^2
-        rate_frd: Processed angular rates in FRD frame [roll, pitch, yaw] rad/s
+        frd_ang_vel: Processed angular rates in FRD frame [roll, pitch, yaw] rad/s
     """
     if not self._enable_output:
       return
@@ -131,7 +135,7 @@ class InferenceLogger:
       f"  raw_action:      [{raw_action[0]:+.4f}, {raw_action[1]:+.4f}, {raw_action[2]:+.4f}, {raw_action[3]:+.4f}]"
     )
     self._logger.info(f"  thrust_acc:      {thrust_acc:+.3f} m/s^2")
-    self._logger.info(f"  rate_frd:        [{rate_frd[0]:+.4f}, {rate_frd[1]:+.4f}, {rate_frd[2]:+.4f}] rad/s")
+    self._logger.info(f"  frd_ang_vel:     [{frd_ang_vel[0]:+.4f}, {frd_ang_vel[1]:+.4f}, {frd_ang_vel[2]:+.4f}] rad/s")
     self._logger.info("=" * 60)
 
   def log_features(

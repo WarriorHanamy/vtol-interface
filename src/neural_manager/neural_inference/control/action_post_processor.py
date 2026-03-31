@@ -83,7 +83,7 @@ class ActionPostProcessor:
 
     self._last_action = np.zeros(4, dtype=np.float32)
     self._last_thrust_acc = 0.0
-    self._last_rate_frd = np.zeros(3, dtype=np.float32)
+    self._last_frd_ang_vel = np.zeros(3, dtype=np.float32)
     self._control_command_count = 0
 
     if self._logger:
@@ -122,20 +122,20 @@ class ActionPostProcessor:
     pitch_rate = pitch_rate_raw * self._max_ang_vel[1]
     yaw_rate = yaw_rate_raw * self._max_ang_vel[2]
 
-    rate_flu = np.array([roll_rate, pitch_rate, yaw_rate])
-    rate_frd = frd_flu_rotate(rate_flu)
+    flu_ang_vel = np.array([roll_rate, pitch_rate, yaw_rate])
+    frd_ang_vel = frd_flu_rotate(flu_ang_vel)
 
-    self._publish_angular_rates(rate_flu, rate_frd)
+    self._publish_angular_rates(flu_ang_vel, frd_ang_vel)
 
-    return self._create_acc_rates_message(thrust_raw, rate_frd)
+    return self._create_acc_rates_message(thrust_raw, frd_ang_vel)
 
-  def _create_acc_rates_message(self, thrust_raw: float, rate_frd: np.ndarray) -> VehicleAccRatesSetpoint:
+  def _create_acc_rates_message(self, thrust_raw: float, frd_ang_vel: np.ndarray) -> VehicleAccRatesSetpoint:
     """
     Create VehicleAccRatesSetpoint message.
 
     Args:
         thrust_raw: Normalized thrust acceleration [-1, 1]
-        rate_frd: Body rates in FRD frame [roll, pitch, yaw] rad/s
+        frd_ang_vel: Body rates in FRD frame [roll, pitch, yaw] rad/s
 
     Returns:
         VehicleAccRatesSetpoint message
@@ -146,12 +146,12 @@ class ActionPostProcessor:
     thrust_acc = self._convert_thrust_to_acceleration(thrust_raw)
     msg.thrust_axis_acc_sp = float(thrust_acc)
 
-    msg.rates_sp[0] = float(rate_frd[0])
-    msg.rates_sp[1] = float(rate_frd[1])
-    msg.rates_sp[2] = float(rate_frd[2])
+    msg.rates_sp[0] = float(frd_ang_vel[0])
+    msg.rates_sp[1] = float(frd_ang_vel[1])
+    msg.rates_sp[2] = float(frd_ang_vel[2])
 
     self._last_thrust_acc = float(thrust_acc)
-    self._last_rate_frd = rate_frd.copy()
+    self._last_frd_ang_vel = frd_ang_vel.copy()
 
     msg.sol_time = -1.0
 
@@ -159,18 +159,18 @@ class ActionPostProcessor:
       direction = "↑ UP" if thrust_acc < 0 else ("↓ DOWN" if thrust_acc > 0 else "— ZERO")
       self._logger.info(
         f"VehicleAccRatesSetpoint: thrust_axis_acc_sp={thrust_acc:+.3f} m/s² ({direction}), "
-        f"rates_sp=[{rate_frd[0]:+.3f}, {rate_frd[1]:+.3f}, {rate_frd[2]:+.3f}] rad/s (FRD)"
+        f"rates_sp=[{frd_ang_vel[0]:+.3f}, {frd_ang_vel[1]:+.3f}, {frd_ang_vel[2]:+.3f}] rad/s (FRD)"
       )
 
     return msg
 
-  def _publish_angular_rates(self, rate_flu: np.ndarray, rate_frd: np.ndarray):
+  def _publish_angular_rates(self, flu_ang_vel: np.ndarray, frd_ang_vel: np.ndarray):
     """
     Publish angular rate commands in both FLU and FRD coordinate frames.
 
     Args:
-        rate_flu: Angular rates in FLU (body) frame [roll, pitch, yaw] rad/s
-        rate_frd: Angular rates in FRD (PX4 body) frame [roll, pitch, yaw] rad/s
+        flu_ang_vel: Angular rates in FLU (body) frame [roll, pitch, yaw] rad/s
+        frd_ang_vel: Angular rates in FRD (PX4 body) frame [roll, pitch, yaw] rad/s
     """
     if self._angular_rate_flu_pub is None or self._angular_rate_frd_pub is None:
       return
@@ -181,18 +181,18 @@ class ActionPostProcessor:
     msg_flu.header.stamp.sec = int(timestamp)
     msg_flu.header.stamp.nanosec = int((timestamp - int(timestamp)) * 1e9)
     msg_flu.header.frame_id = "body_flu"
-    msg_flu.vector.x = float(rate_flu[0])
-    msg_flu.vector.y = float(rate_flu[1])
-    msg_flu.vector.z = float(rate_flu[2])
+    msg_flu.vector.x = float(flu_ang_vel[0])
+    msg_flu.vector.y = float(flu_ang_vel[1])
+    msg_flu.vector.z = float(flu_ang_vel[2])
     self._angular_rate_flu_pub.publish(msg_flu)
 
     msg_frd = Vector3Stamped()
     msg_frd.header.stamp.sec = int(timestamp)
     msg_frd.header.stamp.nanosec = int((timestamp - int(timestamp)) * 1e9)
     msg_frd.header.frame_id = "body_frd"
-    msg_frd.vector.x = float(rate_frd[0])
-    msg_frd.vector.y = float(rate_frd[1])
-    msg_frd.vector.z = float(rate_frd[2])
+    msg_frd.vector.x = float(frd_ang_vel[0])
+    msg_frd.vector.y = float(frd_ang_vel[1])
+    msg_frd.vector.z = float(frd_ang_vel[2])
     self._angular_rate_frd_pub.publish(msg_frd)
 
   def _convert_thrust_to_acceleration(self, thrust_raw: float) -> float:
@@ -258,11 +258,11 @@ class ActionPostProcessor:
     Returns:
         Dictionary containing:
         - thrust_acc: Thrust acceleration in m/s^2
-        - rate_frd: Angular rates in FRD frame [roll, pitch, yaw] rad/s
+        - frd_ang_vel: Angular rates in FRD frame [roll, pitch, yaw] rad/s
     """
     return {
       "thrust_acc": self._last_thrust_acc,
-      "rate_frd": self._last_rate_frd.copy(),
+      "frd_ang_vel": self._last_frd_ang_vel.copy(),
     }
 
   def convert_action_for_display(self, raw_action: np.ndarray) -> dict:
@@ -384,5 +384,5 @@ class ActionPostProcessor:
     """Reset processor state for fresh start."""
     self._last_action = np.zeros(4, dtype=np.float32)
     self._last_thrust_acc = 0.0
-    self._last_rate_frd = np.zeros(3, dtype=np.float32)
+    self._last_frd_ang_vel = np.zeros(3, dtype=np.float32)
     self._control_command_count = 0

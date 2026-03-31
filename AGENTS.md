@@ -19,3 +19,12 @@ uv run ruff check --fix .
 ```
 
 Never use Optional for type hinting.
+
+# Math Conventions
+
+- This repo quaternion convention is `(w, x, y, z)`.
+- `px4_msg` quaternion convention is `(w, x, y, z)`.
+- A 3D vector expressed in a world frame should use frame-first naming, for example `ned_position` and `ned_velocity`.
+- A frame-specific quaternion must encode both frames in its name using `source_quat_target`, for example `ned_quat_frd` and `enu_quat_flu`.
+- Do not use bare names like `quat` for frame-specific quaternions, except when accessing external-library fields such as `msg.q`.
+- Any quaternion returned by a `get_*` method must be canonicalized so `quat[0] >= 0`.
