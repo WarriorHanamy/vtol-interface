@@ -1,8 +1,6 @@
 [Unit]
 Description=Neural Executor Service (runs inside ros2 container)
 
-BindsTo=ros2-liveness.service
-After=ros2-liveness.service
 PartOf=sim-session.service
 Before=neural.target
 
