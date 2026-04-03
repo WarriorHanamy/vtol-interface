@@ -1,6 +1,6 @@
 # Simulation Session Service Architecture
 
-This document describes the systemd-based service architecture for managing VTOL simulation and neural services.
+This document describes the systemd-based service architecture for managing the simulation-side VTOL session and neural services.
 
 ## Architecture Overview
 
