@@ -1,4 +1,4 @@
-.PHONY: list docker-offload-build docker-px4-build docker-ros2-build docker-shell docker-neural-launch
+.PHONY: list docker-offload-build docker-px4-build docker-ros2-build docker-shell docker-neural-launch docker-build-ros2-jetson docker-run-ros2-jetson
 
 
 # =============================================================================
@@ -29,6 +29,13 @@ PX4_GIT_URL ?= $(shell git $(GIT_SAFE_FLAGS) -C "$(PX4_SUBMODULE_PATH)" remote g
 PX4_GIT_REF ?= $(shell git $(GIT_SAFE_FLAGS) -C "$(PX4_SUBMODULE_PATH)" symbolic-ref --quiet --short HEAD 2>/dev/null || printf 'main')
 PX4_GIT_COMMIT ?= $(shell git $(GIT_SAFE_FLAGS) -C "$(PX4_SUBMODULE_PATH)" rev-parse HEAD 2>/dev/null)
 PX4_GIT_TAG ?= $(shell git $(GIT_SAFE_FLAGS) -C "$(PX4_SUBMODULE_PATH)" describe --exclude ext/* --always --tags --dirty 2>/dev/null)
+
+# Jetson variables
+DOCKER := docker
+PLATFORM := linux/arm64
+IMAGE_PREFIX ?= vtol
+IMAGE_SUFFIX ?= jetson
+ROS2_IMAGE := $(IMAGE_PREFIX)/ros2-$(IMAGE_SUFFIX):latest
 
 docker-offload-ros2BuildTask:
 	@docker rm -f $(VTOL_OFFLOAD_CONTAINER) > /dev/null 2>&1 || true
@@ -108,6 +115,30 @@ sim-attach:
 
 docker-shell:
 	@docker compose exec ros2 bash -lc "source /opt/ros/humble/setup.bash && source /home/ros/ros2_ws/install/setup.bash && exec bash"
+
+# =============================================================================
+# Jetson Targets (ARM64 cross-compilation)
+# =============================================================================
+
+docker-build-ros2-jetson:
+	$(DOCKER) run --rm --privileged tonistiigi/binfmt --install arm64 || true
+	$(DOCKER) buildx build \
+		--platform $(PLATFORM) \
+		-f dockerfiles/ros2.dockerfile \
+		-t $(ROS2_IMAGE) \
+		--load \
+		.
+
+docker-run-ros2-jetson:
+	$(DOCKER) run --rm \
+		--platform $(PLATFORM) \
+		--net=host \
+		--privileged \
+		-e DISPLAY=$(DISPLAY) \
+		-v /tmp/.X11-unix:/tmp/.X11-unix \
+		-v $(HOME)/.Xauthority:/home/ros/.Xauthority \
+		$(ROS2_IMAGE) \
+		bash -c "source /opt/ros/humble/setup.bash && source /home/ros/ros2_ws/install/setup.bash && exec bash"
 
 # Neural Services Management (group-based)
 # =============================================================================

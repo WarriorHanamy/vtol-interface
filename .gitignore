@@ -166,3 +166,6 @@ Pipfile.lock
 
 *.bak
 **/completed-tdd-archives/
+
+# OpenCode planning
+.opencode/
